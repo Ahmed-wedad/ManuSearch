@@ -3,6 +3,8 @@
 <div align="center"> 
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b5212f.svg?logo=arxiv)](https://arxiv.org/pdf/2505.18105)
+[![dataset](https://img.shields.io/badge/dataset-Hugging%20Face-yellow?logo=huggingface)](https://huggingface.co/datasets/RUC-AIBOX/ORION)
+[![License](https://img.shields.io/badge/LICENSE-MIT-green.svg)](https://opensource.org/licenses/MIT) 
 
 </div>
 
@@ -34,6 +36,7 @@ conda create --name manusearch python=3.9
 conda activate manusearch
 
 # Install requirements
+cd ManuSearch
 pip install -r requirements.txt
 ```
 ## 🏃 Quick Start
@@ -106,15 +109,15 @@ python run_manusearch.py \
 - `--proxy`: "port-based proxy(e.g., localhost:8080)"
 - `--google_subscription_key`: Your serper.dev Google Search API subscription key.
 - `--google_search_topk`: topk returned documents for google search.
-- ` --planner_model_name`: "Name of the planner model to use"\
--  `--planner_api_base`: "Base URL for the API endpoint"\
--  `--planner_api_key`: "api key for the planner model API endpoint"\
--  `--searcher_model_name`: "Name of the searcher model to use"\
--  `--searcher_api_base`: "Base URL for the API endpoint"\
--  `--searcher_api_key`: "api key for the searcher model API endpoint"\
--  `--reader_model_name`: "Name of the reader model to use"\
--  `--reader_api_base`: "Base URL for the API endpoint"\
--  `--reader_api_key`: "api key for the reader model API endpoint"\
+- ` --planner_model_name`: "Name of the planner model to use".
+-  `--planner_api_base`: "Base URL for the API endpoint".
+-  `--planner_api_key`: "api key for the planner model API endpoint".
+-  `--searcher_model_name`: "Name of the searcher model to use".
+-  `--searcher_api_base`: "Base URL for the API endpoint".
+-  `--searcher_api_key`: "api key for the searcher model API endpoint".
+-  `--reader_model_name`: "Name of the reader model to use".
+-  `--reader_api_base`: "Base URL for the API endpoint".
+-  `--reader_api_key`: "api key for the reader model API endpoint".
 
 
 ### Evaluation
@@ -125,4 +128,19 @@ python eval_ans_searchagent.py \
   --api_base "MODEL_API_BASE_URL"\
   --api_key "YOUR_API_KEY"\
   --file_path "path/to/your/answers"
+```
+
+## 📄 Citation
+
+If you find this work helpful, please cite our paper:
+```bibtex
+@misc{huang2025manusearchdemocratizingdeepsearch,
+      title={ManuSearch: Democratizing Deep Search in Large Language Models with a Transparent and Open Multi-Agent Framework}, 
+      author={Lisheng Huang and Yichen Liu and Jinhao Jiang and Rongxiang Zhang and Jiahao Yan and Junyi Li and Wayne Xin Zhao},
+      year={2025},
+      eprint={2505.18105},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2505.18105}, 
+}
 ```
