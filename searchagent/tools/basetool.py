@@ -19,6 +19,7 @@ class BaseTool(ABC, BaseModel):
 
     def to_schema(self) -> Dict:
         """Convert tool to function call format."""
+        
         return {
             "type": "function",
             "function": {

@@ -50,7 +50,7 @@ The current search intent: {search_intent}
 Extract relevant information according to the following requirements:
 - You need to read the document content carefully and extract all the information related to the current search query and the query intention. 
 - The information you extract should be as detailed as possible, and try to list all relevant information completely. Try to ensure a high recall rate and do not omit any relevant information.
-- The information you extract must be based on the content of the provided web page, and it must be real and valid. Do not fabricate information out of thin air, and avoid having hallucinations. 
+- The information you extract must be based on the content of the provided markdown document, and it must be real and valid. Do not fabricate information out of thin air, and avoid having hallucinations. 
 ## Output Format
 {{ 
     "think": "<your think process> using string format",

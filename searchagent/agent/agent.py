@@ -154,7 +154,7 @@ class AgentInterface:
             planner=self.planner,
             searcher=self.searcher,
             recorder=self.recorder,
-            max_turn=10,
+            max_turn=1,
             llm=self.planner_model,
             iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
         )

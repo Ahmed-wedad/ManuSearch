@@ -10,6 +10,10 @@ from ..tools.tool_collection import ToolCollection
 from ..tools.final_answer import FinalAnswerTool
 from ..tools.visitpage import VisitPage
 from ..tools.websearch import GoogleSearch
+try:
+    from ..tools.vectorstore_search import VectorStoreSearch
+except Exception:
+    VectorStoreSearch = None
 class Searcher(BaseStreamingAgent):
     """A module responsible for parsing and summarizing relevant information from search results."""
     def __init__(
@@ -19,7 +23,7 @@ class Searcher(BaseStreamingAgent):
         collected_tools: ToolCollection = None,
         user_input_template: str = "{question}",
         user_context_template: str = None,
-        max_turn: int = 10,
+        max_turn: int = 3,
         max_length = 24576,
         **baseconfig
     ):
@@ -115,19 +119,19 @@ class Searcher(BaseStreamingAgent):
         whether_exceed_max_tokens = False
         messages = [AgentMessage(sender="user", content=message)]
         try:
-            for turn in range(self.max_turn):
+            for turn in range(self.max_turn):  
                 if turn == self.max_turn-1:
                     messages.append({
                         "role": "user",
                         "content": "Maximum number of rounds exceeded, please call final answer tools immediately based on information already collected"                    
                     })
                 ignore = False
-                print(messages)
+                # print(messages)
                 with timeit("searcher inference"):
                     references = ""
                     references_url = {}
                     for response in super().forward(messages, tools=self.tools_schema, tool_choice="auto", session_id=session_id):
-
+                        
                         if isinstance(response.content, str) and response.content:
                             yield 'model_response', response.content, {}
  
@@ -136,8 +140,8 @@ class Searcher(BaseStreamingAgent):
                             for tool in response.content.tool_calls:
                                 name = get_tool_name(tool)
                                 tools_in_resp.append(name)
-                                if name == 'final_answer' and turn == 0 and ('visitpage' in tools_in_resp or 'GoogleSearch' in tools_in_resp):
-                                    ignore = True   
+                                if name == 'final_answer' and turn == 0 and ('visitpage' in tools_in_resp or 'ZillizSearch' in tools_in_resp):
+                                    ignore = True
                                     continue
                                 arg = get_tool_arg(tool)
                                 resp = parse_resp_to_json(arg)
@@ -159,8 +163,8 @@ class Searcher(BaseStreamingAgent):
                                             sender='searcher_response'
                                         )
                                         yield 'final_answer', references, references_url
-                                        
-                                    elif name == 'GoogleSearch':
+
+                                    elif name == 'ZillizSearch':
                                         query_list.extend(resp.get('query', []))
 
                 
@@ -168,36 +172,52 @@ class Searcher(BaseStreamingAgent):
                 messages = []
                 # Tool calls
                 if not isinstance(response.content, str):
-                    # debugs = [f"arguments: {toolcall.function.arguments}, name: {toolcall.function.name}" for toolcall in response.content.tool_calls]
-                    # print(debugs)
+                    # print(len(response.content.tool_calls))
                     for tool_call in response.content.tool_calls:
                         name = tool_call.function.name
                         args = load_multiple_dict(tool_call.function.arguments)
                         if name:
-                            if name.lower() == 'googlesearch':
+                            if  name.lower() == 'zillizsearch':
                                 with timeit("search web && get summary"):
                                     if 'intent' in args:
-                                       if isinstance(args['intent'], list):
-                                            args['intent'] = ' '.join(args['intent'])
+                                        if isinstance(args['intent'], list):
+                                            # Handle nested lists by flattening and converting to strings
+                                            flattened_intent = []
+                                            for item in args['intent']:
+                                                if isinstance(item, list):
+                                                    flattened_intent.extend(str(subitem) for subitem in item)
+                                                else:
+                                                    flattened_intent.append(str(item))
+                                            args['intent'] = ' '.join(flattened_intent)
+                                        elif not isinstance(args['intent'], str):
+                                            args['intent'] = str(args['intent'])
                                     else:
                                         args['intent'] = "" 
+                                    # Handle query parameter - ensure it's a string for search tool
+                                    if 'query' in args:
+                                        if isinstance(args['query'], list):
+                                            # Join list elements into a single query string
+                                            flattened_query = []
+                                            for item in args['query']:
+                                                if isinstance(item, list):
+                                                    flattened_query.extend(str(subitem) for subitem in item)
+                                                else:
+                                                    flattened_query.append(str(item))
+                                            args['query'] = ' '.join(flattened_query)
+                                        elif not isinstance(args['query'], str):
+                                            args['query'] = str(args['query'])
+                                    
                                     all_argumens = copy.deepcopy(list(args.keys()))
                                     for key in all_argumens:
                                         if key not in ['query', 'intent']:
                                             args.pop(key)
                                     search_results = self.collected_tools.execute(name=name, tool_input=args)
                                     yield 'webpages', search_results, {}
-                                    summ_provided_by_engine = next(({key: item} for key, item in search_results.items() if item['url'] == ""), None)
-                                    if summ_provided_by_engine:
-                                        part_result = dict(list({key: item for key, item in search_results.items() if item['url']}.items())[:4])
-                                        result_list = list(summ_provided_by_engine.values())+list(part_result.values())
-                                        search_results = {i: value for i, value in enumerate(result_list)}
-                                        search_results, cur_url_to_chunk_score = self.reader.get_llm_summ(search_results, question, topic, args['intent'], args['query'])
-                                    else:
-                                        search_results, cur_url_to_chunk_score = self.reader.get_llm_summ(search_results, question, topic, args['intent'], args['query'])
+                                    search_results, cur_url_to_chunk_score = self.reader.get_llm_summ(search_results, question, topic, args['intent'], args['query'])
 
+                                
                                 if self.search_results:
-                                    search_results = {key+len(self.search_results):value for key, value in search_results.items()}
+                                    search_results = {key+str(len(self.search_results)):value for key, value in search_results.items()}
 
                                 self.search_results.update(search_results)
                                 if isinstance(cur_url_to_chunk_score, dict):
@@ -207,14 +227,15 @@ class Searcher(BaseStreamingAgent):
                                 result = json.dumps(web_result, ensure_ascii=False)
                                 recorder.update(
                                     node_name=question,
-                                    node_content=args['query'],
+                                    node_content=args.get('query', ""),
                                     content=web_result,
                                     memory=self.agent.memory,
                                     sender='searcher'
                                 )
+
                                 messages.append({
                                     "role": "tool",
-                                    "tool_call_id": tool_call.id,
+                                    'tool_call_id': tool_call.id,
                                     "content": copy.deepcopy(result)
                                 })
 
@@ -232,14 +253,13 @@ class Searcher(BaseStreamingAgent):
                                     return references
                                 else:
                                     messages.append({
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.id,
+                                        "role": "user",
                                         "content": "Cannot execute this function call. Please retry!"
                                     }) 
                                     
                             else:
                                 messages.append({
-                                    "role": "tool",
+                                    "role": "user",
                                     "tool_call_id": tool_call.id,
                                     "content": "Based on the search results, Please answer the question again."
                                 })
@@ -247,7 +267,7 @@ class Searcher(BaseStreamingAgent):
 
                         else:
                             messages.append({
-                                "role": "tool",
+                                "role": "user",
                                 "tool_call_id": tool_call.id,
                                 "content": "Cannot execute this function call. Please retry!"
                             })

@@ -1,3 +1,4 @@
+from multiprocessing.resource_sharer import stop
 import os, requests, traceback, time, warnings, openai
 from logging import getLogger
 from copy import copy
@@ -9,7 +10,7 @@ from ..schema import ModelStatusCode
 from ..schema import AgentMessage 
 from ..utils.memory import Memory, MemoryManager
 from ..utils.utils import remove_think_tags
-
+import json
 from openai.types.chat.chat_completion_message_tool_call import (
     ChatCompletionMessageToolCall,
     Function,
@@ -325,6 +326,7 @@ class GPTAPI(BaseAPILLM):
                         messages=messages,
                         **data
                     )
+                
                 return response.choices[0].message
 
             except requests.ConnectionError:
@@ -383,7 +385,7 @@ class GPTAPI(BaseAPILLM):
         whether_tools = False
         stop_words = gen_params.get('stop_words')
         if stop_words is None:
-            stop_words = []
+            gen_params.pop('stop_words')
         # mapping to role that openai supports
         # messages = self.template_parser(inputs)
         messages = inputs
@@ -391,11 +393,11 @@ class GPTAPI(BaseAPILLM):
             if status:
                 whether_tools = True
             if isinstance(response, dict):
-                parsed_tools =[ 
-                    ChatCompletionMessageToolCall(
-                        id=response[key].id,
-                        function=Function(arguments=response[key].function.arguments,name=response[key].function.name),
-                        type=response[key].type
+                parsed_tools = [
+                        ChatCompletionMessageToolCall(
+                            id=response[key].id,
+                            function=Function(arguments=response[key].function.arguments, name=response[key].function.name),
+                            type=response[key].type
                     ) for key in response
                 ]
                 if text:
@@ -483,8 +485,34 @@ class GPTAPI(BaseAPILLM):
                             if chunk.choices[0].finish_reason == 'stop':
                                 return
 
-                else:
+                elif self.model_type.lower().startswith("magistral"):
+                    for chunk in raw_response:
+                        if not chunk or not chunk.choices:
+                            continue
 
+                        choice_delta = chunk.choices[0].delta
+                        content = getattr(choice_delta, "content", None)
+
+                        if chunk.choices[0].finish_reason == 'stop':
+                            return
+
+                        # If content is structured (list of reasoning blocks)
+                        if isinstance(content, list):
+                            for block in content:
+                                if block.get("type") == "thinking":
+                                    # Process reasoning fragment
+                                    for inner in block.get("thinking", []):
+                                        if inner.get("type") == "text":
+                                            yield inner.get("text", ""), False
+                                elif block.get("type") == "text":
+                                    # Process final answer content
+                                    yield block.get("text", ""), False
+
+                        # Fallback for unexpected types
+                        elif isinstance(content, str):
+                            yield content, False
+
+                else:
                     for chunk in raw_response:
                         if chunk:
                             if chunk.choices:
@@ -497,7 +525,7 @@ class GPTAPI(BaseAPILLM):
             except KeyboardInterrupt:
                 raise  # 重新抛出让上层处理
             except Exception as e:
-                logger.error(f"Streaming error: {str(e)}")
+                # logger.error(f"Streaming error: {str(e)}")
                 raise
             finally:
                 # 确保响应流被关闭
@@ -530,7 +558,9 @@ class GPTAPI(BaseAPILLM):
             openai.api_key = self.keys[self.key_ctr]
             openai.base_url = self.url
             response = dict()
-            try:
+            # if self.model_type.lower().startswith("mistral"):
+            #     print(messages[-1])
+            try: 
                 if tools:
                     response = openai.chat.completions.create(
                         messages=messages,
@@ -633,11 +663,18 @@ class GPTAPI(BaseAPILLM):
                 if json_mode:
                     data['response_format'] = {'type': 'json_object'}
         
-        else:# 本地 local...
+        else:  # For non-OpenAI models (like Gemini)
             gen_params.pop('skip_special_tokens', None)
-            gen_params.pop('session_id',None)
-
-            data = {'model': model_type,  **gen_params}
+            gen_params.pop('session_id', None)
+            # Remove parameters that might cause issues with Gemini
+            if model_type.lower().startswith('gemini'):
+                gen_params.pop('frequency_penalty', None)  # Ensure this is removed
+                gen_params.pop('presence_penalty', None)   # Remove this too if present
+            if model_type.lower().startswith('magistral') or model_type.lower().startswith('mistral'):
+                # Validate `stop`
+                if 'stop' in gen_params:
+                        gen_params.pop('stop', None)
+            data = {'model': model_type, **gen_params}
         return data
     
     
@@ -692,6 +729,44 @@ class StreamingAgentMixin:
     def update_memory(self, message:Union[List[AgentMessage], AgentMessage, None], session_id=0):
         if self.memory:
             self.memory.add(message, session_id=session_id)
+    
+
+    def convert_one_message_to_dict(self, message: ChatCompletionMessage) -> dict:
+        """
+        Converts a ChatCompletionMessage (with possible tool_calls) into a dict suitable
+        for sending via the Gemini OpenAI-compatible API.
+        """
+        message_dict = {
+            "role": message.role,
+            "content": message.content or "",  # Avoid null by defaulting to empty string
+        }
+
+        if message.tool_calls:
+            tool = message.tool_calls[0]  # single element at a time as requested
+
+            # Parse the arguments once (avoid concatenated JSON)
+            try:
+                # Assume tool.function.arguments is already a JSON string or dict
+                args_obj = (json.loads(tool.function.arguments)
+                            if isinstance(tool.function.arguments, str)
+                            else tool.function.arguments)
+            except Exception:
+                # Fallback: could log or raise
+                args_obj = {}
+
+            # Build structured tool_call entry with valid JSON
+            message_dict["tool_calls"] = [
+                {
+                    "id": tool.id or "",
+                    "type": tool.type,
+                    "function": {
+                        "name": tool.function.name,
+                        "arguments": json.dumps(args_obj)
+                    }
+                }
+            ]
+
+        return message_dict
 
     def _aggregate(self, memory: Memory, system_instruction):
         _message = []
@@ -705,8 +780,11 @@ class StreamingAgentMixin:
                 
                 # 工具调用tools
                 if isinstance(message.content, ChatCompletionMessage):
-
-                    _message.append(message.content)
+                    if self.llm.model_type.lower().startswith("gemini"):
+                        message_dict = self.convert_one_message_to_dict(message.content)
+                        _message.append(message_dict)
+                    else:
+                        _message.append(message.content)
 
                 # 用户问题
                 elif message.sender == 'user' or message.sender == 'searcher' :
@@ -733,7 +811,7 @@ class BaseStreamingAgent(StreamingAgentMixin):
         template: Union[str, dict, List[dict]] = None,
         system_prompt: str = None,
         memory: Dict = dict(type=Memory),
-        max_turn: int = 10,
+        max_turn: int = 2,
         **kwargs,
     ):
         

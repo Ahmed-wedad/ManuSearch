@@ -34,7 +34,7 @@ class SearchAgent:
         recorder: Recorder,
         llm,
         iterative_prompt,
-        max_turn: int = 10
+        max_turn: int = 1
     ):
         """
         Initializes the SearchAgent with required components for each stage of the search process.
