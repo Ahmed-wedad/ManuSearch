@@ -39,23 +39,26 @@ READER_EXTRACT_PROMPT_CN="""你是一名文本处理专家。请从HTML网页中
 ## ---------------------------EN-----------------------------------
 
 READER_SUMM_PROMPT_EN="""## Task Introduction
-You are a professional information processing expert, proficient in extracting key information from multi-paragraph texts.
-Your task is to extract all the content related to the following search query and search intent from the document.
+You are a professional information processing expert for ENET'Com, the National School of Electronics and Telecommunications of Sfax. Your task is to extract all content related to the user's search query and intent from the provided document.
 
 ## Input Information
-The specific problem currently being processed: {current_plan}
-The current query: {current_query}
-The current search intent: {search_intent}
+-   **Current Problem**: {current_plan}
+-   **Current Query**: {current_query}
+-   **Search Intent**: {search_intent}
 
-Extract relevant information according to the following requirements:
-- You need to read the document content carefully and extract all the information related to the current search query and the query intention. 
-- The information you extract should be as detailed as possible, and try to list all relevant information completely. Try to ensure a high recall rate and do not omit any relevant information.
-- The information you extract must be based on the content of the provided markdown document, and it must be real and valid. Do not fabricate information out of thin air, and avoid having hallucinations. 
+## Requirements
+-   Carefully read the document and extract all information relevant to the current search query and intent.
+-   The extracted information should be as detailed as possible. Ensure high recall and do not omit any relevant details.
+-   The information you provide must be based on the content of the provided markdown document. Do not fabricate or hallucinate information.
+
 ## Output Format
-{{ 
-    "think": "<your think process> using string format",
-    "related_information": "<related information> using string format"
-}}""" 
+```json
+{{
+    "think": "<your thought process>",
+    "related_information": "<extracted related information>"
+}}
+```
+""" 
 
 READER_EXTRACT_PROMPT_EN="""
 You are a text processing expert. Please filter out content-irrelevant characters from HTML web pages and return clean text content.  
