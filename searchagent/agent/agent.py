@@ -42,13 +42,15 @@ class AgentInterface:
         max_new_tokens,
         searcher_same_parameters,
         reader_same_parameters,
-        max_turn=3
+        max_turn=3,
+        searcher_max_turn=3
     ):
 
         self.date = datetime.now().strftime("The current date is %Y-%m-%d.")
         self.proxy = proxy
         self.search_api_key = google_subscription_key
         self.max_turn = max_turn
+        self.searcher_max_turn = searcher_max_turn
         self.webpage_cache = WebPageCache(
             cache_dir=my_cache_dir,
         )
@@ -142,6 +144,7 @@ class AgentInterface:
             llm=self.searcher_model,
             reader=self.reader,
             collected_tools=self.searcher_tools,
+            max_turn=self.searcher_max_turn,
         )
         self.recorder = Recorder(
             action=None
