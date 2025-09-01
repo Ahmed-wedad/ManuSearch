@@ -41,12 +41,14 @@ class AgentInterface:
         repetition_penalty, 
         max_new_tokens,
         searcher_same_parameters,
-        reader_same_parameters
+        reader_same_parameters,
+        max_turn=3
     ):
 
         self.date = datetime.now().strftime("The current date is %Y-%m-%d.")
         self.proxy = proxy
         self.search_api_key = google_subscription_key
+        self.max_turn = max_turn
         self.webpage_cache = WebPageCache(
             cache_dir=my_cache_dir,
         )
@@ -154,7 +156,7 @@ class AgentInterface:
             planner=self.planner,
             searcher=self.searcher,
             recorder=self.recorder,
-            max_turn=3,
+            max_turn=self.max_turn,
             llm=self.planner_model,
             iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
         )

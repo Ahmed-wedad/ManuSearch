@@ -215,15 +215,11 @@ class ZillizSearch(BaseTool):
                 for doc in docs:
                     doc_content = doc.get('page_content', '').strip()
                     
-                    # Skip invalid content early
-                    if not self._is_valid_content(doc_content):
-                        logger.debug(f"Skipping invalid content: {doc_content[:100]}...")
-                        continue
-                        
+                   
                     # Use a more robust hash for duplicate detection
                     # Remove whitespace and common formatting for better duplicate detection
-                    clean_for_hash = doc_content.replace('\n', ' ').replace('*', '').replace('#', '').strip()
-                    content_hash = hash(clean_for_hash[:1000])  # Use first 1000 chars for hashing
+                    # clean_for_hash = doc_content.replace('\n', ' ').replace('*', '').replace('#', '').strip()
+                    content_hash = hash(doc_content[:1000])  # Use first 1000 chars for hashing
                     
                     if content_hash not in seen_docs:
                         seen_docs.add(content_hash)
@@ -288,12 +284,9 @@ class ZillizSearch(BaseTool):
                 valid_chunk_count = 0
                 for i, doc in enumerate(docs_in_group):
                     content = doc.get('page_content', '').strip()
-                    
-                    # Filter out low-quality content
-                    if self._is_valid_content(content):
-                        chunk_key = f"chunk_{valid_chunk_count}"
-                        chunk_content[chunk_key] = content
-                        valid_chunk_count += 1
+                    chunk_key = f"chunk_{valid_chunk_count}"
+                    chunk_content[chunk_key] = content
+                    valid_chunk_count += 1
                 
                 # Skip this document group if no valid content found
                 if not chunk_content:
