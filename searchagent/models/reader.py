@@ -122,12 +122,14 @@ class Reader(BaseStreamingAgent):
                 llm_summs[key] = reader_json.get('related_information', '')
             except:
                 pass
+        
+        # Ensure the output format matches what the rest of the system expects
         for key, page in search_results.items():
             if key in llm_summs:
-                page['content'] = llm_summs[key]
+                page['content'] = llm_summs[key]  # Convert back to string summary after processing chunks
             else:
                 page['content'] = ""
-        return search_results, None # {url: {chunk_dict, scores}}
+        return search_results, None # {url: {processed_summary_string, title, date, score}}
 
     def extract_text(self, tool_return):
         messages = {}
