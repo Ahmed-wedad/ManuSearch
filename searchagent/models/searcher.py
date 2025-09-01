@@ -1,6 +1,6 @@
 import re, json, logging, traceback, copy
 from typing import Dict
-from pydantic import Field
+# from pydantic import Field
 from ..models.basellm import BaseStreamingAgent
 from ..models.reader import Reader
 from ..models.recorder import Recorder
@@ -10,10 +10,7 @@ from ..tools.tool_collection import ToolCollection
 from ..tools.final_answer import FinalAnswerTool
 from ..tools.visitpage import VisitPage
 from ..tools.websearch import GoogleSearch
-try:
-    from ..tools.vectorstore_search import VectorStoreSearch
-except Exception:
-    VectorStoreSearch = None
+
 class Searcher(BaseStreamingAgent):
     """A module responsible for parsing and summarizing relevant information from search results."""
     def __init__(
@@ -23,7 +20,7 @@ class Searcher(BaseStreamingAgent):
         collected_tools: ToolCollection = None,
         user_input_template: str = "{question}",
         user_context_template: str = None,
-        max_turn: int = 3,
+        max_turn: int = 5,
         max_length = 24576,
         **baseconfig
     ):
