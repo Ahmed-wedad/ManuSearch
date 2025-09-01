@@ -20,7 +20,7 @@ class Searcher(BaseStreamingAgent):
         collected_tools: ToolCollection = None,
         user_input_template: str = "{question}",
         user_context_template: str = None,
-        max_turn: int = 5,
+        max_turn: int = 3,
         max_length = 24576,
         **baseconfig
     ):

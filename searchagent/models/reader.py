@@ -68,23 +68,26 @@ class Reader(BaseStreamingAgent):
             url_to_chunks[key] = item['content']
             if 'content' not in item or not item['content']:
                 continue
-            # chunked_str = '=========='.join([f"Chunk {key}:{value}" for key, value in item['content'].items()])
-            # chunked_str = chunked_str[:16192]
+            
+            # Handle the new chunked content format from ZillizSearch
+            if isinstance(item['content'], dict):
+                # Use ManuSearch native logic for regrouping chunks
+                chunked_str = '=========='.join([f"Chunk {chunk_key}:{chunk_value}" for chunk_key, chunk_value in item['content'].items()])
+                chunked_str = chunked_str[:16192]  # Limit content size
+            else:
+                # Fallback for string content
+                chunked_str = str(item['content'])[:16192]
+            
             if 'title' not in item:
                 item['title'] = ""
-            content = self.input_prompt.format(date=item['date'], title=item['title'], content=item['content'])
+            content = self.input_prompt.format(date=item['date'], title=item['title'], content=chunked_str)
             chatbox=[
                 {"role": 'system', 'content': system_prompt},
                 {'role': 'user', 'content': content}
             ]
             messages[key]=chatbox
 
-#         messages, url_to_chunks = self.group_and_build_messages(
-#     search_results=search_results,
-#     system_prompt=system_prompt,
-#     input_prompt=self.input_prompt,   # your existing prompt string with {date},{title},{content}
-#     max_chars=16192
-# )
+
         with timeit("reader llm summ"):
             url2summ = {}
             with ThreadPoolExecutor(max_workers=5) as executor:
