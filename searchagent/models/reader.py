@@ -64,15 +64,23 @@ class Reader(BaseStreamingAgent):
         
         messages, url_to_chunks={}, {}
         system_prompt = self.summary_prompt.format(current_plan=question, user_query = user_query, search_intent=search_intent, current_query=current_query)
+        
+        # Handle single grouped result from ZillizSearch (all documents concatenated)
         for key, item in search_results.items():
             url_to_chunks[key] = item['content']
             if 'content' not in item or not item['content']:
                 continue
             
-            # Handle the new chunked content format from ZillizSearch
+            # Handle the chunked content format from ZillizSearch
             if isinstance(item['content'], dict):
-                # Use ManuSearch native logic for regrouping chunks
-                chunked_str = '=========='.join([f"Chunk {chunk_key}:{chunk_value}" for chunk_key, chunk_value in item['content'].items()])
+                # Concatenate all chunks into a single string for processing
+                # This mimics the old reader.py approach of building one large content string
+                chunked_parts = []
+                for chunk_key, chunk_value in item['content'].items():
+                    chunked_parts.append(f"[{chunk_key}] {chunk_value}")
+                
+                # Join all chunks with separators (similar to old concatenation approach)
+                chunked_str = '\n==========\n'.join(chunked_parts)
                 chunked_str = chunked_str[:16192]  # Limit content size
             else:
                 # Fallback for string content
@@ -80,6 +88,8 @@ class Reader(BaseStreamingAgent):
             
             if 'title' not in item:
                 item['title'] = ""
+            
+            # Create single message for all concatenated content
             content = self.input_prompt.format(date=item['date'], title=item['title'], content=chunked_str)
             chatbox=[
                 {"role": 'system', 'content': system_prompt},

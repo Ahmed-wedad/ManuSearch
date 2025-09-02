@@ -176,7 +176,7 @@ class ZillizSearch(BaseTool):
             intent can be: 'compare', 'find', 'summarize', 'detailed', 'latest', 'historical'
 
         Returns:
-            Search results in ManuSearch format
+            Search results in ManuSearch format with all documents concatenated into single group
         """
         try:
             # Extract parameters
@@ -195,117 +195,77 @@ class ZillizSearch(BaseTool):
 
             logger.info(f"ZillizSearch executing with queries: {queries}, intents: {intents}")
 
-            # Handle multiple queries separately instead of concatenating
-            all_docs = []
-            seen_docs = set()  # To avoid duplicates based on content
+            # Concatenate all queries into a single search (reverting to original approach)
+            combined_query = ' '.join(queries)
+            combined_intent = intents[0] if intents else None
             
-            # Process each query with its corresponding intent
-            for i, query in enumerate(queries):
-                # Use corresponding intent or first intent or None
-                current_intent = intents[i] if i < len(intents) else (intents[0] if intents else None)
-                
-                logger.info(f"Processing query {i+1}/{len(queries)}: '{query}' with intent: {current_intent}")
-                
-                # Get documents for this specific query
-                docs = self.retriever.get_relevant_docs(query, k=self.top_k, intent=current_intent)
-                logger.info(f"Retrieved {len(docs)} documents for query: '{query}'")
-                
-                # Add unique documents to avoid duplicates
-                valid_docs_count = 0
-                for doc in docs:
-                    doc_content = doc.get('page_content', '').strip()
-                    
-                   
-                    # Use a more robust hash for duplicate detection
-                    # Remove whitespace and common formatting for better duplicate detection
-                    # clean_for_hash = doc_content.replace('\n', ' ').replace('*', '').replace('#', '').strip()
-                    content_hash = hash(doc_content[:1000])  # Use first 1000 chars for hashing
-                    
-                    if content_hash not in seen_docs:
-                        seen_docs.add(content_hash)
-                        all_docs.append(doc)
-                        valid_docs_count += 1
-                
-                logger.info(f"Added {valid_docs_count} valid documents from query: '{query}'")
+            logger.info(f"Combined query: '{combined_query}' with intent: {combined_intent}")
+            
+            # Get documents for the combined query
+            docs = self.retriever.get_relevant_docs(combined_query, k=self.top_k, intent=combined_intent)
+            logger.info(f"Retrieved {len(docs)} documents for combined query")
+            
+            # Filter valid documents
+            valid_docs = []
+            for doc in docs:
+                doc_content = doc.get('page_content', '').strip()
+                if self._is_valid_content(doc_content):
+                    valid_docs.append(doc)
 
             # Check if we have any valid documents
-            if not all_docs:
+            if not valid_docs:
                 logger.warning("No valid documents found after filtering")
                 return {}
 
-            logger.info(f"Total valid documents collected: {len(all_docs)}")
+            logger.info(f"Total valid documents after filtering: {len(valid_docs)}")
 
-            # Group documents by document source/title for chunking
-            doc_groups = {}
-            for doc in all_docs:
-                metadata = doc.get('metadata', {})
-                # Use document_id, title, or URL as grouping key
-                group_key = (
-                    metadata.get('document_id') or 
-                    metadata.get('title') or 
-                    metadata.get('url') or 
-                    metadata.get('filename') or
-                    'unknown'
-                )
-                
-                if group_key not in doc_groups:
-                    doc_groups[group_key] = []
-                doc_groups[group_key].append(doc)
-
-            # Convert to ManuSearch expected format with chunked content
+            # Create single grouped result with all documents concatenated
+            # This mimics how the old reader.py was concatenating chunks
             search_results = {}
-            result_id = 0
-
-            # Process each document group
-            for group_key, docs_in_group in doc_groups.items():
-                if not docs_in_group:
-                    continue
-                    
-                # Get representative metadata from first document in group
-                first_doc = docs_in_group[0]
-                metadata = first_doc.get('metadata', {})
+            
+            # Group all documents into a single result entry
+            all_chunks_content = {}
+            all_titles = []
+            all_scores = []
+            all_dates = []
+            
+            for i, doc in enumerate(valid_docs):
+                metadata = doc.get('metadata', {})
+                content = doc.get('page_content', '').strip()
                 
-                # Extract title from metadata or content
-                title = metadata.get('title', metadata.get('filename', f'ENET\'Com Document {result_id}'))
+                # Extract title
+                title = metadata.get('title', metadata.get('filename', f'Document {i}'))
+                if title and title not in all_titles:
+                    all_titles.append(title)
                 
-                if not title and first_doc.get('page_content'):
-                    # Try to extract title from first line of markdown
-                    lines = first_doc.get('page_content', '').split('\n')
-                    for line in lines:
-                        if line.strip().startswith('#'):
-                            title = line.strip().lstrip('#').strip()
-                            break
-
-                if not title:
-                    title = f'ENET\'Com Document {result_id}'
-
-                # Create chunked content dict from all documents in group
-                chunk_content = {}
-                valid_chunk_count = 0
-                for i, doc in enumerate(docs_in_group):
-                    content = doc.get('page_content', '').strip()
-                    chunk_key = f"chunk_{valid_chunk_count}"
-                    chunk_content[chunk_key] = content
-                    valid_chunk_count += 1
+                # Collect scores and dates
+                all_scores.append(doc.get('score', 1.0))
+                date = metadata.get('date', '2024')
+                if date not in all_dates:
+                    all_dates.append(date)
                 
-                # Skip this document group if no valid content found
-                if not chunk_content:
-                    logger.warning(f"Skipping document group '{group_key}' - no valid content after filtering")
-                    continue
+                # Add content as chunk
+                chunk_key = f"chunk_{i}"
+                all_chunks_content[chunk_key] = content
 
-                # Prune metadata to keep only relevant fields
-                clean_meta, _ = prune_metadata_batch(metadata, keep_keys=KEEP)
+            # Skip if no valid content found
+            if not all_chunks_content:
+                logger.warning("No valid content found in any documents")
+                return {}
 
-                search_results[str(result_id)] = {
-                    "title": title,
-                    "content": chunk_content,  # Now it's a dict of chunks like ManuSearch expects
-                    "date": clean_meta.get('date', '2024'),
-                    "score": max(doc.get('score', 1.0) for doc in docs_in_group),  # Use highest score in group
-                    # "metadata": clean_meta
-                }
-                result_id += 1
+            # Create single search result with all documents combined
+            combined_title = " | ".join(all_titles[:3])  # Use first 3 titles
+            if len(all_titles) > 3:
+                combined_title += f" (+{len(all_titles)-3} more)"
+            
+            search_results["0"] = {
+                "title": combined_title,
+                "content": all_chunks_content,  # All chunks in one dict
+                "date": all_dates[0] if all_dates else '2024',  # Use first date
+                "score": max(all_scores) if all_scores else 1.0,  # Use highest score
+            }
 
-            logger.info(f"ZillizSearch returned {len(search_results)} document groups from {len(all_docs)} total chunks")
+            logger.info(f"ZillizSearch returned 1 combined document group with {len(all_chunks_content)} chunks from {len(valid_docs)} documents")
             return search_results
 
         except Exception as e:
