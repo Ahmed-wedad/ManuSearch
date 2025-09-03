@@ -16,17 +16,9 @@ logger = logging.getLogger(__name__)
 # Metadata fields to keep when pruning
 KEEP = {
     "document_id",
-    "chunk_id",
-    "title",
-    "url",
-    "document_source",
-    "date",
     "chunk_size",
     "chunk_timestamp",
     "parent_section_path",
-    "source_page_title",
-    "download_url",
-    "source_type",
 }
 
 
