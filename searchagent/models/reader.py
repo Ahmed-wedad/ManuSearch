@@ -66,41 +66,26 @@ class Reader(BaseStreamingAgent):
         system_prompt = self.summary_prompt.format(current_plan=question, user_query = user_query, search_intent=search_intent, current_query=current_query)
         
         # Handle single grouped result from ZillizSearch (all documents concatenated)
-        for key, item in search_results.items():
-            url_to_chunks[key] = item['content']
+        for item in search_results.values():
+            url = item['intent']
+            url_to_chunks[url] = item['content']
             if 'content' not in item or not item['content']:
                 continue
-            
-            # Handle the chunked content format from ZillizSearch
-            if isinstance(item['content'], dict):
-                # Concatenate all chunks into a single string for processing
-                # This mimics the old reader.py approach of building one large content string
-                chunked_parts = []
-                for chunk_key, chunk_value in item['content'].items():
-                    chunked_parts.append(f"[{chunk_key}] {chunk_value}")
-                
-                # Join all chunks with separators (similar to old concatenation approach)
-                chunked_str = '\n==========\n'.join(chunked_parts)
-                chunked_str = chunked_str[:16192]  # Limit content size
-            else:
-                # Fallback for string content
-                chunked_str = str(item['content'])[:16192]
-            
+            chunked_str = '=========='.join([f"Chunk {key}:{value['content']}" for key, value in item['content'].items()])
+            # chunked_str = chunked_str[:16192]
             if 'title' not in item:
                 item['title'] = ""
-            
-            # Create single message for all concatenated content
-            content = self.input_prompt.format(date=item['date'], title=item['title'], content=chunked_str)
+            content = self.input_prompt.format(date=item['date'], title=f"Results for intent: {item['intent']}", content=chunked_str)
             chatbox=[
                 {"role": 'system', 'content': system_prompt},
                 {'role': 'user', 'content': content}
             ]
-            messages[key]=chatbox
+            messages[url]=chatbox
 
 
         with timeit("reader llm summ"):
             url2summ = {}
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            with ThreadPoolExecutor(max_workers=3) as executor:
                 future_to_url = {
                     executor.submit(self.llm.chat, chatbox): url
                     for url, chatbox in messages.items()
@@ -132,14 +117,12 @@ class Reader(BaseStreamingAgent):
                 llm_summs[key] = reader_json.get('related_information', '')
             except:
                 pass
-        
-        # Ensure the output format matches what the rest of the system expects
-        for key, page in search_results.items():
-            if key in llm_summs:
-                page['content'] = llm_summs[key]  # Convert back to string summary after processing chunks
+        for page in search_results.values():
+            if page['intent'] in llm_summs:
+                page['content'] = llm_summs[page['intent']]
             else:
                 page['content'] = ""
-        return search_results, None # {url: {processed_summary_string, title, date, score}}
+        return search_results, None # {url: {chunk_dict, scores}}
 
     def extract_text(self, tool_return):
         messages = {}

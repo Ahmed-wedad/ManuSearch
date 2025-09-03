@@ -176,33 +176,33 @@ class Searcher(BaseStreamingAgent):
                         if name:
                             if  name.lower() == 'zillizsearch':
                                 with timeit("search web && get summary"):
-                                    if 'intent' in args:
-                                        if isinstance(args['intent'], list):
-                                            # Handle nested lists by flattening and converting to strings
-                                            flattened_intent = []
-                                            for item in args['intent']:
-                                                if isinstance(item, list):
-                                                    flattened_intent.extend(str(subitem) for subitem in item)
-                                                else:
-                                                    flattened_intent.append(str(item))
-                                            args['intent'] = ' '.join(flattened_intent)
-                                        elif not isinstance(args['intent'], str):
-                                            args['intent'] = str(args['intent'])
-                                    else:
+                                #     if 'intent' in args:
+                                #         if isinstance(args['intent'], list):
+                                #             # Handle nested lists by flattening and converting to strings
+                                #             flattened_intent = []
+                                #             for item in args['intent']:
+                                #                 if isinstance(item, list):
+                                #                     flattened_intent.extend(str(subitem) for subitem in item)
+                                #                 else:
+                                #                     flattened_intent.append(str(item))
+                                #             args['intent'] = ' '.join(flattened_intent)
+                                #         elif not isinstance(args['intent'], str):
+                                #             args['intent'] = str(args['intent'])
+                                    if 'intent' not in args:
                                         args['intent'] = "" 
                                     # Handle query parameter - ensure it's a string for search tool
-                                    if 'query' in args:
-                                        if isinstance(args['query'], list):
-                                            # Join list elements into a single query string
-                                            flattened_query = []
-                                            for item in args['query']:
-                                                if isinstance(item, list):
-                                                    flattened_query.extend(str(subitem) for subitem in item)
-                                                else:
-                                                    flattened_query.append(str(item))
-                                            args['query'] = ' '.join(flattened_query)
-                                        elif not isinstance(args['query'], str):
-                                            args['query'] = str(args['query'])
+                                    # if 'query' in args:
+                                    #     if isinstance(args['query'], list):
+                                    #         # Join list elements into a single query string
+                                    #         flattened_query = []
+                                    #         for item in args['query']:
+                                    #             if isinstance(item, list):
+                                    #                 flattened_query.extend(str(subitem) for subitem in item)
+                                    #             else:
+                                    #                 flattened_query.append(str(item))
+                                    #         args['query'] = ' '.join(flattened_query)
+                                    #     elif not isinstance(args['query'], str):
+                                    #         args['query'] = str(args['query'])
                                     
                                     all_argumens = copy.deepcopy(list(args.keys()))
                                     for key in all_argumens:
@@ -210,7 +210,9 @@ class Searcher(BaseStreamingAgent):
                                             args.pop(key)
                                     search_results = self.collected_tools.execute(name=name, tool_input=args)
                                     yield 'webpages', search_results, {}
+                                    # print("before reader : ", search_results)
                                     search_results, cur_url_to_chunk_score = self.reader.get_llm_summ(search_results, question, topic, args['intent'], args['query'])
+                                    # print("after reader : ", search_results)
 
                                 
                                 if self.search_results:

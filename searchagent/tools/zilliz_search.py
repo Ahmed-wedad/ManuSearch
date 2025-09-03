@@ -122,50 +122,7 @@ class ZillizSearch(BaseTool):
             }
         }
 
-    def _is_valid_content(self, content: str) -> bool:
-        """
-        Check if content is valid and not just formatting artifacts.
-        
-        Args:
-            content: The content string to validate
-            
-        Returns:
-            True if content is valid, False otherwise
-        """
-        if not content or len(content.strip()) < 10:
-            return False
-            
-        # Clean the content for analysis
-        clean_content = content.strip()
-        
-        # Remove common markdown/formatting characters for analysis
-        analysis_content = clean_content.replace('\n', '').replace('*', '').replace('#', '').replace('`', '').replace('-', '').strip()
-        
-        # Check if content is mostly formatting characters
-        if len(analysis_content) < 5:
-            return False
-            
-        # Check ratio of actual content vs formatting
-        content_ratio = len(analysis_content) / len(clean_content)
-        if content_ratio < 0.3:  # Less than 30% actual content
-            return False
-            
-        # Check for repeated patterns (like many newlines or asterisks)
-        if '\n\n\n\n' in content or '****' in content or '```\n\n```' in content:
-            return False
-            
-        # Check for excessive repetition of any character
-        for char in ['\n', '*', '#', '`', '-', '_']:
-            if content.count(char) > len(content) * 0.5:  # More than 50% of same character
-                return False
-            
-        # Check if content has some actual words (not just symbols)
-        import re
-        words = re.findall(r'\b\w{3,}\b', analysis_content)
-        if len(words) < 3:  # Less than 3 meaningful words
-            return False
-            
-        return True
+
 
     def execute(self, **kwargs) -> Dict[str, Any]:
         """
@@ -195,77 +152,65 @@ class ZillizSearch(BaseTool):
 
             logger.info(f"ZillizSearch executing with queries: {queries}, intents: {intents}")
 
-            # Concatenate all queries into a single search (reverting to original approach)
-            combined_query = ' '.join(queries)
-            combined_intent = intents[0] if intents else None
+            # Process each query individually and collect docs per query-intent pair
+            all_docs = []
             
-            logger.info(f"Combined query: '{combined_query}' with intent: {combined_intent}")
+            for i, query in enumerate(queries):
+                logger.info(f"Processing query {i+1}/{len(queries)}: '{query}'")
+                
+                # Get corresponding intent or use default
+                current_intent = intents[i] if i < len(intents) else "general"
+                
+                # Get documents for this individual query
+                docs = self.retriever.get_relevant_docs(query, k=self.top_k)
+                logger.info(f"Retrieved {len(docs)} documents for query: '{query}' with intent: '{current_intent}'")
+                
+                # Add all retrieved documents to the combined list with query-intent info
+                for doc in docs:
+                    doc['_query'] = query
+                    doc['_intent'] = current_intent
+                    doc['_query_index'] = i
+                all_docs.extend(docs)
             
-            # Get documents for the combined query
-            docs = self.retriever.get_relevant_docs(combined_query, k=self.top_k, intent=combined_intent)
-            logger.info(f"Retrieved {len(docs)} documents for combined query")
+            # Use all collected documents for further processing
+            docs = all_docs
+            logger.info(f"Total retrieved documents from all queries: {len(docs)}")
             
-            # Filter valid documents
-            valid_docs = []
+            # Group by intent with nested document structure
+            intent_groups = {}
+            
             for doc in docs:
-                doc_content = doc.get('page_content', '').strip()
-                if self._is_valid_content(doc_content):
-                    valid_docs.append(doc)
-
-            # Check if we have any valid documents
-            if not valid_docs:
-                logger.warning("No valid documents found after filtering")
-                return {}
-
-            logger.info(f"Total valid documents after filtering: {len(valid_docs)}")
-
-            # Create single grouped result with all documents concatenated
-            # This mimics how the old reader.py was concatenating chunks
-            search_results = {}
-            
-            # Group all documents into a single result entry
-            all_chunks_content = {}
-            all_titles = []
-            all_scores = []
-            all_dates = []
-            
-            for i, doc in enumerate(valid_docs):
-                metadata = doc.get('metadata', {})
+                raw_metadata = doc.get('metadata', {})
                 content = doc.get('page_content', '').strip()
                 
-                # Extract title
-                title = metadata.get('title', metadata.get('filename', f'Document {i}'))
-                if title and title not in all_titles:
-                    all_titles.append(title)
+                # Get intent info from the document
+                intent = doc.get('_intent')
                 
-                # Collect scores and dates
-                all_scores.append(doc.get('score', 1.0))
-                date = metadata.get('date', '2024')
-                if date not in all_dates:
-                    all_dates.append(date)
+                # Prune metadata to keep only relevant fields
+                metadata, removed_metadata = prune_metadata_item(raw_metadata, keep_keys=KEEP)
                 
-                # Add content as chunk
-                chunk_key = f"chunk_{i}"
-                all_chunks_content[chunk_key] = content
-
-            # Skip if no valid content found
-            if not all_chunks_content:
-                logger.warning("No valid content found in any documents")
-                return {}
-
-            # Create single search result with all documents combined
-            combined_title = " | ".join(all_titles[:3])  # Use first 3 titles
-            if len(all_titles) > 3:
-                combined_title += f" (+{len(all_titles)-3} more)"
+                if intent not in intent_groups:
+                    # First occurrence of this intent
+                    intent_groups[intent] = {
+                        'intent': intent,
+                        'date': '2024',  # Date of retrieval
+                        'content': {}
+                    }
+                
+                # Add document to this intent group
+                doc_index = len(intent_groups[intent]['content'])
+                intent_groups[intent]['content'][str(doc_index)] = {
+                    'content': content,
+                    "score": doc.get('score', 0),
+                    'metadata': metadata
+                }
             
-            search_results["0"] = {
-                "title": combined_title,
-                "content": all_chunks_content,  # All chunks in one dict
-                "date": all_dates[0] if all_dates else '2024',  # Use first date
-                "score": max(all_scores) if all_scores else 1.0,  # Use highest score
-            }
-
-            logger.info(f"ZillizSearch returned 1 combined document group with {len(all_chunks_content)} chunks from {len(valid_docs)} documents")
+            # Convert to final format - return intent groups directly
+            search_results = {}
+            for idx, (intent, group_data) in enumerate(intent_groups.items()):
+                search_results[str(idx)] = group_data
+            
+            logger.info(f"ZillizSearch returned {len(search_results)} intent groups")
             return search_results
 
         except Exception as e:
@@ -306,37 +251,37 @@ def prune_metadata_item(
 
         return meta, removed
 
-def prune_metadata_batch(
-        metas: Union[Dict, List[Dict]],
-        remove_keys: Union[List[str], set, None] = None,
-        keep_keys: Union[List[str], set, None] = None,
-        in_place: bool = False
-    ) -> Tuple[Union[Dict, List[Dict]], List[Dict]]:
-        """
-        Prune a single dict or list of dicts.
+# def prune_metadata_batch(
+#         metas: Union[Dict, List[Dict]],
+#         remove_keys: Union[List[str], set, None] = None,
+#         keep_keys: Union[List[str], set, None] = None,
+#         in_place: bool = False
+#     ) -> Tuple[Union[Dict, List[Dict]], List[Dict]]:
+#         """
+#         Prune a single dict or list of dicts.
 
-        Args:
-            metas: dict or list of dicts.
-            remove_keys: iterable of keys to remove (optional).
-            keep_keys: iterable of keys to KEEP (optional). If provided, removal is (all_keys - keep_keys).
-            in_place: if True, mutate items in-place when metas is a list; otherwise works on copies.
+#         Args:
+#             metas: dict or list of dicts.
+#             remove_keys: iterable of keys to remove (optional).
+#             keep_keys: iterable of keys to KEEP (optional). If provided, removal is (all_keys - keep_keys).
+#             in_place: if True, mutate items in-place when metas is a list; otherwise works on copies.
 
-        Returns:
-            (pruned_metas, removed_per_item) - pruned_metas is same type as input metas (dict or list of dicts).
-            - removed_per_item is a list of dicts showing keys removed for each item (single-item case returns list with one dict).
-        """
-        rem = set(remove_keys) if remove_keys is not None else None
-        keep = set(keep_keys) if keep_keys is not None else None
+#         Returns:
+#             (pruned_metas, removed_per_item) - pruned_metas is same type as input metas (dict or list of dicts).
+#             - removed_per_item is a list of dicts showing keys removed for each item (single-item case returns list with one dict).
+#         """
+#         rem = set(remove_keys) if remove_keys is not None else None
+#         keep = set(keep_keys) if keep_keys is not None else None
 
-        if isinstance(metas, dict):
-            p, r = prune_metadata_item(metas, remove_keys=rem, keep_keys=keep, in_place=in_place)
-            return p, [r]
+#         if isinstance(metas, dict):
+#             p, r = prune_metadata_item(metas, remove_keys=rem, keep_keys=keep, in_place=in_place)
+#             return p, [r]
 
-        pruned_list = []
-        removed_list = []
-        for item in metas:
-            p, r = prune_metadata_item(item, remove_keys=rem, keep_keys=keep, in_place=in_place)
-            pruned_list.append(p)
-            removed_list.append(r)
+#         pruned_list = []
+#         removed_list = []
+#         for item in metas:
+#             p, r = prune_metadata_item(item, remove_keys=rem, keep_keys=keep, in_place=in_place)
+#             pruned_list.append(p)
+#             removed_list.append(r)
 
-        return pruned_list, removed_list
+#         return pruned_list, removed_list
