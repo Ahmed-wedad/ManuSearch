@@ -117,12 +117,34 @@ class Reader(BaseStreamingAgent):
                 llm_summs[key] = reader_json.get('related_information', '')
             except:
                 pass
+        
+        # Reformat search_results: add summary as "sum" field and flatten chunk metadata/scores
         for page in search_results.values():
             if page['intent'] in llm_summs:
-                page['content'] = llm_summs[page['intent']]
+                # Add the LLM summary as a new "sum" field at the top level
+                page['sum'] = llm_summs[page['intent']]
             else:
-                page['content'] = ""
-        return search_results, None # {url: {chunk_dict, scores}}
+                page['sum'] = ""
+            
+            # Flatten and rename: extract chunk metadata/scores and remove individual content fields
+            if 'content' in page and isinstance(page['content'], dict):
+                # Extract chunk metadata and scores, flatten to top level under sum
+                chunks_metadata = {}
+                for chunk_id, chunk_data in page['content'].items():
+                    if isinstance(chunk_data, dict):
+                        # Keep only metadata and score, remove content
+                        chunk_meta = {}
+                        if 'metadata' in chunk_data:
+                            chunk_meta['metadata'] = chunk_data['metadata']
+                        if 'score' in chunk_data:
+                            chunk_meta['score'] = chunk_data['score']
+                        chunks_metadata[chunk_id] = chunk_meta
+                
+                # Replace 'content' with 'chunks' containing flattened metadata/scores
+                page['chunks'] = chunks_metadata
+                del page['content']
+        
+        return search_results, None # {intent: {sum: summary, chunks: {chunk_id: {metadata, score}}}}
 
     def extract_text(self, tool_return):
         messages = {}
