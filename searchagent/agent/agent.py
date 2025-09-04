@@ -161,7 +161,8 @@ class AgentInterface:
             recorder=self.recorder,
             max_turn=self.max_turn,
             llm=self.planner_model,
-            iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+            iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d")),
+            skip_planner_first_question=True  # Enable direct search for first questions
         )
 
         if use_en:
@@ -192,7 +193,7 @@ class AgentInterface:
         print('*****'*5, solve_method, deep_reasoning, '*****'*5)
         
         try:
-            for step in self.agent.forward(context, mode=solve_method):
+            for step in self.agent.forward(context, mode=solve_method, context=history):
                 yield step, use_en
                 
         except Exception as e:

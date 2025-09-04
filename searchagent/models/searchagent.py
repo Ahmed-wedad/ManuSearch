@@ -34,7 +34,8 @@ class SearchAgent:
         recorder: Recorder,
         llm,
         iterative_prompt,
-        max_turn: int = 1
+        max_turn: int = 1,
+        skip_planner_first_question: bool = True
     ):
         """
         Initializes the SearchAgent with required components for each stage of the search process.
@@ -45,6 +46,7 @@ class SearchAgent:
             reader (`Reader`): Parses and summarizes the search results.
             recorder (`Recorder`): Records intermediate results and memories.
             max_turn (`int`): Maximum number of iterations (turns) for the process.
+            skip_planner_first_question (`bool`): Whether to skip planner for first question.
         """
         self.planner = planner
         self.searcher = searcher
@@ -52,15 +54,18 @@ class SearchAgent:
         self.max_turn = max_turn
         self.llm = llm
         self.iterative_prompt = iterative_prompt
+        self.skip_planner_first_question = skip_planner_first_question
 
-    def forward(self, query, mode='iterative'):
+    def forward(self, query, mode='iterative', context=None):
     
         start_time = time.time()
         self.recorder.container['content'].add_root_node(node_content=query)
+        
         try:
-                self.planner.agent.system_prompt = self.iterative_prompt
-                for response in self.iterative(query):
-                    yield response
+            # Use iterative mode (now handles first question skipping internally)
+            self.planner.agent.system_prompt = self.iterative_prompt
+            for response in self.iterative(query):
+                yield response
         except:
             formatted_messages = [
                 {"role":"user", "content":query}            
@@ -92,29 +97,49 @@ class SearchAgent:
         try:
 
             for turn in range(self.max_turn):
-                # Plan the one search step.   User search query --> Overall search steps
-                logging.info('planner planning....')
-                with timeit("Planner"):
+                # Check if this is the first turn and we should skip planning
+                if turn == 0 and self.skip_planner_first_question:
+                    # Skip planning phase for first question - go directly to search
+                    logging.info('First iteration: skipping planner, going directly to searcher....')
+                    current_plan = {
+                        'actions': 'extract_problems',
+                        'content': query,  # Use original query directly
+                        'evaluation_previous_goal': 'Success - First question, skipping planner',
+                        'think': 'Direct search for first question',
+                        'challenges': 'None'
+                    }
+                    
+                    # Yield planning status to maintain consistency with expected flow
+                    yield {
+                        'plan': current_plan,
+                        'status': 'planning'
+                    }
+                    
+                    message = planner_message.get()  # Clear the queue
+                else:
+                    # Normal planning phase for subsequent turns
+                    logging.info('planner planning....')
+                    with timeit("Planner"):
 
-                    message = planner_message.get()
-                    for response in self.planner.plan(
-                        message=message,
-                        recorder=self.recorder
-                    ):
-                        current_plan = parse_resp_to_json(response.content)
+                        message = planner_message.get()
+                        for response in self.planner.plan(
+                            message=message,
+                            recorder=self.recorder
+                        ):
+                            current_plan = parse_resp_to_json(response.content)
 
-                        if isinstance(current_plan, dict) and 'actions' in current_plan:
-                            if current_plan['actions'] == 'final_response':
-                                yield {
-                                    'final_resp': current_plan,
-                                    'status': 'reasoning',
-                                    'ref2url': references_url # global index
-                                }
-                            else:
-                                yield {
-                                    'plan': current_plan,
-                                    'status': 'planning'
-                                }
+                            if isinstance(current_plan, dict) and 'actions' in current_plan:
+                                if current_plan['actions'] == 'final_response':
+                                    yield {
+                                        'final_resp': current_plan,
+                                        'status': 'reasoning',
+                                        'ref2url': references_url # global index
+                                    }
+                                else:
+                                    yield {
+                                        'plan': current_plan,
+                                        'status': 'planning'
+                                    }
 
                 # Execute search and summarize results for each sub-query
                 
