@@ -72,7 +72,7 @@ class Reader(BaseStreamingAgent):
             if 'content' not in item or not item['content']:
                 continue
             chunked_str = '=========='.join([f"Chunk {key}:{value['content']}" for key, value in item['content'].items()])
-            # chunked_str = chunked_str[:16192]
+            chunked_str = chunked_str[:16192]
             if 'title' not in item:
                 item['title'] = ""
             content = self.input_prompt.format(date=item['date'], title=f"Results for intent: {item['intent']}", content=chunked_str)
@@ -85,7 +85,7 @@ class Reader(BaseStreamingAgent):
 
         with timeit("reader llm summ"):
             url2summ = {}
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            with ThreadPoolExecutor(max_workers=20) as executor:
                 future_to_url = {
                     executor.submit(self.llm.chat, chatbox): url
                     for url, chatbox in messages.items()

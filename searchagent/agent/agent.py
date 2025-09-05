@@ -115,7 +115,7 @@ class AgentInterface:
 
 
 
-    def get_answer(self, message: str, solve_method='iterative', deep_reasoning=False, history=''):
+    def get_answer(self, message: str, solve_method='iterative', deep_reasoning=False, history='', skip_first_planner=None):
         
         def get_ascii_part(input_text):
             english_count = 0
@@ -161,8 +161,7 @@ class AgentInterface:
             recorder=self.recorder,
             max_turn=self.max_turn,
             llm=self.planner_model,
-            iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d")),
-            skip_planner_first_question=True  # Enable direct search for first questions
+            iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
         )
 
         if use_en:
@@ -192,8 +191,12 @@ class AgentInterface:
             context = message
         print('*****'*5, solve_method, deep_reasoning, '*****'*5)
         
+        # Determine first question optimization
+        # If skip_first_planner is explicitly provided, use it; otherwise use default (False)
+        use_optimization = skip_first_planner if skip_first_planner is not None else False
+        
         try:
-            for step in self.agent.forward(context, mode=solve_method, context=history):
+            for step in self.agent.forward(context, mode=solve_method, skip_first_planner=use_optimization):
                 yield step, use_en
                 
         except Exception as e:

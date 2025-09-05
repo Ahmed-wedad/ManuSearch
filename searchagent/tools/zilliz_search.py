@@ -170,7 +170,7 @@ class ZillizSearch(BaseTool):
             
             # Group by intent with nested document structure
             intent_groups = {}
-            print(docs)
+            # print(docs)
             for doc in docs:
                 raw_metadata = doc.get('metadata', {})
                 content = doc.get('page_content', '').strip()
