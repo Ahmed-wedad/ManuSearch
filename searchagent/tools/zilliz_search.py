@@ -19,6 +19,8 @@ KEEP = {
     "chunk_size",
     "chunk_timestamp",
     "parent_section_path",
+    "url",
+    "download_url"
 }
 
 
