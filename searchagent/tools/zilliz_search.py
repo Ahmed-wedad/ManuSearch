@@ -169,7 +169,7 @@ class ZillizSearch(BaseTool):
             # Use all collected documents for further processing
             docs = all_docs
             logger.info(f"Total retrieved documents from all queries: {len(docs)}")
-            
+            # print("docs", docs)
             # Group by intent with nested document structure
             intent_groups = {}
             # print(docs)
@@ -185,24 +185,40 @@ class ZillizSearch(BaseTool):
                 
                 if intent not in intent_groups:
                     # First occurrence of this intent
-                    intent_groups[intent] = {
-                        'intent': intent,
-                        'date': '2024',  # Date of retrieval
-                        'content': {}
-                    }
+                    intent_groups[intent] = []
                 
-                # Add document to this intent group
-                doc_index = len(intent_groups[intent]['content'])
-                intent_groups[intent]['content'][str(doc_index)] = {
+                # Create document object
+                doc_obj = {
                     'content': content,
                     "score": doc.get('score', 0),
                     'metadata': metadata
                 }
+                
+                # Add to intent groups list
+                intent_groups[intent].append(doc_obj)
             
-            # Convert to final format - return intent groups directly
+            # Split intent groups when they exceed 3 documents
             search_results = {}
-            for idx, (intent, group_data) in enumerate(intent_groups.items()):
-                search_results[str(idx)] = group_data
+            result_index = 0
+            
+            for intent, docs_list in intent_groups.items():
+                # Split docs into chunks of maximum 3 documents
+                chunk_size = 3
+                for i in range(0, len(docs_list), chunk_size):
+                    chunk_docs = docs_list[i:i + chunk_size]
+                    
+                    # Create content dict for this chunk
+                    content_dict = {}
+                    for doc_idx, doc_obj in enumerate(chunk_docs):
+                        content_dict[str(doc_idx)] = doc_obj
+                    
+                    # Create group for this chunk
+                    search_results[str(result_index)] = {
+                        'intent': intent,
+                        'date': '2024',  # Date of retrieval
+                        'content': content_dict
+                    }
+                    result_index += 1
             
             logger.info(f"ZillizSearch returned {len(search_results)} intent groups")
             return search_results
