@@ -667,7 +667,7 @@ class GPTAPI(BaseAPILLM):
             gen_params.pop('skip_special_tokens', None)
             gen_params.pop('session_id', None)
             # Remove parameters that might cause issues with Gemini
-            if model_type.lower().startswith('gemini'):
+            if model_type.lower().startswith('gemini') or model_type.lower().startswith('llama'):
                 gen_params.pop('frequency_penalty', None)  # Ensure this is removed
                 gen_params.pop('presence_penalty', None)   # Remove this too if present
             if model_type.lower().startswith('magistral') or model_type.lower().startswith('mistral'):
@@ -780,7 +780,7 @@ class StreamingAgentMixin:
                 
                 # 工具调用tools
                 if isinstance(message.content, ChatCompletionMessage):
-                    if self.llm.model_type.lower().startswith("gemini") or self.llm.model_type.lower().startswith("qwen") or self.llm.model_type.lower().startswith("llama-3.1-8b-instant") or self.llm.model_type.lower().startswith("moonshotai")   :
+                    if self.llm.model_type.lower().startswith("gemini") or self.llm.model_type.lower().startswith("qwen") or self.llm.model_type.lower().startswith("llama") or self.llm.model_type.lower().startswith("moonshotai") or self.llm.model_type.lower().startswith("deepseek") or self.llm.model_type.lower().startswith("mistral"):
                         message_dict = self.convert_one_message_to_dict(message.content)
                         _message.append(message_dict)
                     else:

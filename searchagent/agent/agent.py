@@ -14,14 +14,14 @@ from ..utils.cache import WebPageCache
 from ..tools.tool_collection import ToolCollection
 from ..tools.final_answer import FinalAnswerTool
 from ..tools.visitpage import VisitPage
-from ..tools.websearch import GoogleSearch
+from ..tools.zilliz_search import ZillizSearch
 
 my_cache_dir = os.getenv('CACHE_DIR')
 
 class AgentInterface:
     def __init__(
         self,
-        google_subscription_key,
+        retriever,
         google_search_topk,
         proxy,
         planner_model_name,
@@ -48,7 +48,7 @@ class AgentInterface:
 
         self.date = datetime.now().strftime("The current date is %Y-%m-%d.")
         self.proxy = proxy
-        self.search_api_key = google_subscription_key
+        self.retriever = retriever
         self.max_turn = max_turn
         self.searcher_max_turn = searcher_max_turn
         self.webpage_cache = WebPageCache(
@@ -109,38 +109,24 @@ class AgentInterface:
         )
 
         self.searcher_tools = ToolCollection(
-            GoogleSearch(api_key=google_subscription_key, topk=google_search_topk), 
+            ZillizSearch(retriever=self.retriever, top_k=google_search_topk), 
             FinalAnswerTool()
         )
-
-
-
-    def get_answer(self, message: str, solve_method='iterative', deep_reasoning=False, history='', skip_first_planner=None):
-        
-        def get_ascii_part(input_text):
-            english_count = 0
-            total_count = len(input_text)
-            for char in input_text:
-                if char.isascii() and char.isalpha():
-                    english_count += 1
-            return english_count/total_count
-            
-        use_en = get_ascii_part(message) > 0.5
 
         self.reader = Reader(
             llm=self.reader_model,
             template=self.date,
-            summary_prompt = READER_SUMM_PROMPT_CN,
-            extract_prompt = READER_EXTRACT_PROMPT_CN,
+            summary_prompt = READER_SUMM_PROMPT_EN,
+            extract_prompt = READER_EXTRACT_PROMPT_EN,
             webpage_cache=self.webpage_cache,
             proxy=self.proxy,
-            search_api_key=self.search_api_key[0]
+            search_api_key="dummy"  # Not used with ZillizSearch
         )
         self.searcher = Searcher(
-            user_context_template=searcher_context_template_cn,
-            user_input_template=searcher_input_template_cn,
+            user_context_template=searcher_context_template_en,
+            user_input_template=searcher_input_template_en,
             template=self.date,
-            system_prompt=SEARCHER_PROMPT_CN,
+            system_prompt=SEARCHER_PROMPT_EN,
             llm=self.searcher_model,
             reader=self.reader,
             collected_tools=self.searcher_tools,
@@ -152,7 +138,7 @@ class AgentInterface:
         self.planner= Planner(
             llm=self.planner_model,
             template=self.date,
-            system_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d")),
+            system_prompt=PLANNER_ITERATIVE_PROMPT_EN
         )
 
         self.agent = SearchAgent(
@@ -161,29 +147,45 @@ class AgentInterface:
             recorder=self.recorder,
             max_turn=self.max_turn,
             llm=self.planner_model,
-            iterative_prompt=PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+            iterative_prompt=PLANNER_ITERATIVE_PROMPT_EN
         )
 
-        if use_en:
-            self.planner.system_prompt = PLANNER_ITERATIVE_PROMPT_EN
-            self.planner.agent.system_prompt = PLANNER_ITERATIVE_PROMPT_EN
-            self.reader.summary_prompt = READER_SUMM_PROMPT_EN
-            self.reader.extract_prompt = READER_EXTRACT_PROMPT_EN
-            self.searcher.user_context_template = searcher_context_template_en
-            self.searcher.user_input_template = searcher_input_template_en
-            self.searcher.system_prompt = SEARCHER_PROMPT_EN
-            self.searcher.agent.system_prompt = SEARCHER_PROMPT_EN
-            self.context_prompt = CONTEXT_PROMPT_EN
-            self.agent.iterative_prompt = PLANNER_ITERATIVE_PROMPT_EN
-        else:
-            self.planner.system_prompt = PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
-            self.reader.summary_prompt = READER_SUMM_PROMPT_CN
-            self.reader.extract_prompt = READER_EXTRACT_PROMPT_CN
-            self.searcher.user_context_template = searcher_context_template_cn
-            self.searcher.user_input_template = searcher_input_template_cn
-            self.searcher.system_prompt = SEARCHER_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
-            self.context_prompt = CONTEXT_PROMPT_CN
-            self.agent.iterative_prompt = PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+    def get_answer(self, message: str, solve_method='iterative', deep_reasoning=False, history=''):
+        # def get_ascii_part(input_text):
+        #     english_count = 0
+        #     total_count = len(input_text)
+        #     for char in input_text:
+        #         if char.isascii() and char.isalpha():
+        #             english_count += 1
+        #     return english_count/total_count
+            
+        # use_en = get_ascii_part(message) > 0.5
+
+
+
+        # if use_en:
+        # self.planner.system_prompt = PLANNER_ITERATIVE_PROMPT_EN
+        self.planner.agent.system_prompt = PLANNER_ITERATIVE_PROMPT_EN
+        # self.reader.summary_prompt = READER_SUMM_PROMPT_EN
+        # self.reader.extract_prompt = READER_EXTRACT_PROMPT_EN
+        # self.searcher.user_context_template = searcher_context_template_en
+        # self.searcher.user_input_template = searcher_input_template_en
+        # self.searcher.system_prompt = SEARCHER_PROMPT_EN
+        self.searcher.agent.system_prompt = SEARCHER_PROMPT_EN
+        self.context_prompt = CONTEXT_PROMPT_EN
+        #     self.agent.iterative_prompt = PLANNER_ITERATIVE_PROMPT_EN
+        # else:
+        #     self.planner.system_prompt = PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+        #     self.reader.summary_prompt = READER_SUMM_PROMPT_CN
+        #     self.reader.extract_prompt = READER_EXTRACT_PROMPT_CN
+        #     self.searcher.user_context_template = searcher_context_template_cn
+        #     self.searcher.user_input_template = searcher_input_template_cn
+        #     self.searcher.system_prompt = SEARCHER_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+        #     self.context_prompt = CONTEXT_PROMPT_CN
+        #     self.agent.iterative_prompt = PLANNER_ITERATIVE_PROMPT_CN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
+        self.planner.system_prompt=PLANNER_ITERATIVE_PROMPT_EN.format(current_date = datetime.now().strftime("%Y-%m-%d")),
+
+        self.agent.iterative_prompt=PLANNER_ITERATIVE_PROMPT_EN.format(current_date = datetime.now().strftime("%Y-%m-%d"))
 
         if history:
             context = self.context_prompt.format(history_qa = history, question = message)
@@ -193,11 +195,11 @@ class AgentInterface:
         
         # Determine first question optimization
         # If skip_first_planner is explicitly provided, use it; otherwise use default (False)
-        use_optimization = skip_first_planner if skip_first_planner is not None else False
+        # use_optimization = skip_first_planner if skip_first_planner is not None else False
         
         try:
-            for step in self.agent.forward(context, mode=solve_method, skip_first_planner=use_optimization):
-                yield step, use_en
+            for step in self.agent.forward(context, mode=solve_method, skip_first_planner=not history):
+                yield step
                 
         except Exception as e:
             print('=='*40)
