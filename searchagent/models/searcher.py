@@ -100,7 +100,8 @@ class Searcher(BaseStreamingAgent):
                     parent_nodes.append((pre_node_name, nodes[pre_node_name]))
 
             parent_response = [
-                dict(question=node_name, answer=node['response']) for node_name, node in parent_nodes
+                dict(question=node_name, answer=node.get('response', '')) for node_name, node in parent_nodes
+                if node.get('response')  # Only include nodes that have responses
             ]
 
             return nodes['root']['content'], parent_response

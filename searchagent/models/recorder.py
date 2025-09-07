@@ -57,7 +57,8 @@ class WebSearchGraph:
                     parent_nodes.append(self.nodes[start_node])
 
         parent_response = [
-            dict(question=node['content'], answer=node['response']) for node in parent_nodes
+            dict(question=node['content'], answer=node.get('response', '')) for node in parent_nodes
+            if node.get('response') is not None  # Only include nodes that have responses
         ]
 
         self.nodes[node_name]["response"] = None
