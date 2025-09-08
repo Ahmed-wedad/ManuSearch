@@ -4,7 +4,7 @@ CONTEXT_PROMPT_CN="""## 历史问答
 {question}
 你现在需要对当前问题进行回答。"""
 
-CONTEXT_PROMPT_EN="""## History Question and Answer
+CONTEXT_PROMPT_EN="""
 {history_qa}
 ## Current Question
 {question}

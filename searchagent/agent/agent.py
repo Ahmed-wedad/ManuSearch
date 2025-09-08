@@ -198,7 +198,7 @@ class AgentInterface:
         # use_optimization = skip_first_planner if skip_first_planner is not None else False
         
         try:
-            for step in self.agent.forward(context, mode=solve_method, skip_first_planner=not history):
+            for step in self.agent.forward(context, mode=solve_method, skip_first_planner=False):
                 yield step
                 
         except Exception as e:

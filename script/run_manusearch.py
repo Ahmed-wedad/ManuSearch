@@ -45,20 +45,18 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=None, help="Random seed for generation. If not set, will use current timestamp as seed.")
     return parser.parse_args()
 
-args = parse_args()
 
-
-async def process_single_sequence(agent, message):
+async def process_single_sequence(agent, message, history):
     seq = {}
 
     # Use run_in_executor to execute synchronized methods
     loop = asyncio.get_event_loop()
     steps = await loop.run_in_executor(
         None,  # Default thread pool
-        lambda: list(agent.get_answer(message, solve_method='iterative'))  # Convert to list to avoid generator problems
+        lambda: list(agent.get_answer(message, solve_method='iterative',history=history))  # Convert to list to avoid generator problems
     )
 
-    for step, use_en in steps:
+    for step in steps:
         answer = step.get('final_resp', '')
 
     think = await loop.run_in_executor(
@@ -72,6 +70,9 @@ async def process_single_sequence(agent, message):
 
 
 async def main_async():
+    # Parse arguments only when running as main script
+    args = parse_args()
+    
     # Set random seed
     if args.seed is None:
         args.seed = int(time.time())
