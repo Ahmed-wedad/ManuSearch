@@ -570,7 +570,7 @@ class GPTAPI(BaseAPILLM):
                     )
                     return streaming(response, has_tool=True)
                 else:
-                    print(messages)
+                    # print(messages)
                     response = openai.chat.completions.create(
                         messages=messages,
                         **data
