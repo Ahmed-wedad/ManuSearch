@@ -23,7 +23,7 @@ class AgentInterface:
         self,
         retriever,
         google_search_topk,
-        proxy,
+        # proxy,
         planner_model_name,
         planner_api_base,
         planner_api_key,
@@ -33,7 +33,7 @@ class AgentInterface:
         reader_model_name, 
         reader_api_base,
         reader_api_key,
-        my_cache_dir,
+        # my_cache_dir,
         temperature,
         top_p, 
         min_p, 
@@ -47,13 +47,13 @@ class AgentInterface:
     ):
 
         self.date = datetime.now().strftime("The current date is %Y-%m-%d.")
-        self.proxy = proxy
+        # self.proxy = proxy
         self.retriever = retriever
         self.max_turn = max_turn
         self.searcher_max_turn = searcher_max_turn
-        self.webpage_cache = WebPageCache(
-            cache_dir=my_cache_dir,
-        )
+        # self.webpage_cache = WebPageCache(
+        #     cache_dir=my_cache_dir,
+        # )
         planner_gen_params = {
             "temperature": temperature,
             "top_p": top_p, 
@@ -118,9 +118,10 @@ class AgentInterface:
             template=self.date,
             summary_prompt = READER_SUMM_PROMPT_EN,
             extract_prompt = READER_EXTRACT_PROMPT_EN,
-            webpage_cache=self.webpage_cache,
-            proxy=self.proxy,
-            search_api_key="dummy"  # Not used with ZillizSearch
+            chat_prompt= CHAT_PROMPT_EN,
+            # webpage_cache=self.webpage_cache,
+            # proxy=self.proxy,
+            # search_api_key="dummy"  # Not used with ZillizSearch
         )
         self.searcher = Searcher(
             user_context_template=searcher_context_template_en,
@@ -160,7 +161,6 @@ class AgentInterface:
         #     return english_count/total_count
             
         # use_en = get_ascii_part(message) > 0.5
-
 
 
         # if use_en:

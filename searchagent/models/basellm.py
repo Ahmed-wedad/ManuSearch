@@ -485,7 +485,7 @@ class GPTAPI(BaseAPILLM):
                             if chunk.choices[0].finish_reason == 'stop':
                                 return
 
-                elif self.model_type.lower().startswith("magistral"):
+                elif self.model_type.lower().startswith("magistral") or self.model_type.lower().startswith("mistral"):
                     for chunk in raw_response:
                         if not chunk or not chunk.choices:
                             continue
@@ -570,6 +570,7 @@ class GPTAPI(BaseAPILLM):
                     )
                     return streaming(response, has_tool=True)
                 else:
+                    print(messages)
                     response = openai.chat.completions.create(
                         messages=messages,
                         **data

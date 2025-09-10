@@ -4,6 +4,7 @@ Zilliz Vector Store Search Tool for ManuSearch.
 Replaces GoogleSearch with vector database search for ENET'Com documents.
 """
 
+from datetime import datetime
 import json
 import logging
 from typing import Dict, List, Any, Tuple, Union
@@ -18,9 +19,8 @@ KEEP = {
     "document_id",
     "chunk_size",
     "chunk_timestamp",
-    "parent_section_path",
-    "url",
-    "download_url"
+    "parent_page_url",
+    "filename"
 }
 
 
@@ -150,148 +150,54 @@ class ZillizSearch(BaseTool):
             all_docs = []
             
             for i, query in enumerate(queries):
-                logger.info(f"Processing query {i+1}/{len(queries)}: '{query}'")
+                # logger.info(f"Processing query {i+1}/{len(queries)}: '{query}'")
                 
-                # Get corresponding intent or use default
-                current_intent = intents[i] if i < len(intents) else "general"
+                # # Get corresponding intent or use default
+                # current_intent = intents[i] if i < len(intents) else "general"
                 
                 # Get documents for this individual query
                 docs = self.retriever.get_relevant_docs(query, k=self.top_k)
-                logger.info(f"Retrieved {len(docs)} documents for query: '{query}' with intent: '{current_intent}'")
+                logger.info(f"Retrieved {len(docs)} documents for query: '{query}' ")
                 
-                # Add all retrieved documents to the combined list with query-intent info
-                for doc in docs:
-                    doc['_query'] = query
-                    doc['_intent'] = current_intent
-                    doc['_query_index'] = i
+                # Add all retrieved documents to the combined list
+                
                 all_docs.extend(docs)
             
             # Use all collected documents for further processing
             docs = all_docs
             logger.info(f"Total retrieved documents from all queries: {len(docs)}")
             # print("docs", docs)
-            # Group by intent with nested document structure
-            intent_groups = {}
+            # Group by parent_page_url with nested document structure
+            url_groups = {}
             # print(docs)
             for doc in docs:
                 raw_metadata = doc.get('metadata', {})
                 content = doc.get('page_content', '').strip()
                 
-                # Get intent info from the document
-                intent = doc.get('_intent')
-                
+                # Get group key from metadata
+                group_key = raw_metadata.get('parent_page_url', raw_metadata.get('download_url'))
+                doc['title'] = raw_metadata.get('parent_page_title', raw_metadata.get('filename', ''))
+                doc['content'] = content
+                doc['score'] = doc.get('score', 0.0)
                 # Prune metadata to keep only relevant fields
-                metadata, removed_metadata = prune_metadata_item(raw_metadata, keep_keys=KEEP)
+                # metadata, _ = prune_metadata_item(raw_metadata, keep_keys=KEEP)
                 
-                if intent not in intent_groups:
-                    # First occurrence of this intent
-                    intent_groups[intent] = []
-                
-                # Create document object
-                doc_obj = {
-                    'content': content,
-                    "score": doc.get('score', 0),
-                    'metadata': metadata
-                }
-                
-                # Add to intent groups list
-                intent_groups[intent].append(doc_obj)
-            
-            # Split intent groups when they exceed 3 documents
-            search_results = {}
-            result_index = 0
-            
-            for intent, docs_list in intent_groups.items():
-                # Split docs into chunks of maximum 3 documents
-                chunk_size = 3
-                for i in range(0, len(docs_list), chunk_size):
-                    chunk_docs = docs_list[i:i + chunk_size]
-                    
-                    # Create content dict for this chunk
-                    content_dict = {}
-                    for doc_idx, doc_obj in enumerate(chunk_docs):
-                        content_dict[str(doc_idx)] = doc_obj
-                    
-                    # Create group for this chunk
-                    search_results[str(result_index)] = {
-                        'intent': intent,
-                        'date': '2024',  # Date of retrieval
-                        'content': content_dict
-                    }
-                    result_index += 1
-            
-            logger.info(f"ZillizSearch returned {len(search_results)} intent groups")
-            return search_results
+                if group_key not in url_groups:
+                    # First occurrence of this url
+                    url_groups[group_key] = []
+          
+                url_groups[group_key].append(doc)
+
+            logger.info(f"ZillizSearch returned {len(url_groups)} url groups")
+
+            return { key : {
+                    'url': url,
+                    'date': datetime.now().strftime("%Y-%m-%d"),
+                    'title': docs_list[0]['title'] if docs_list else '',
+                    'content': {idx:doc['content'] for idx, doc in enumerate(sorted([d for d in docs_list if 'content' in d], key=lambda x: x['score'], reverse=True))}
+                } for key, (url, docs_list) in enumerate(url_groups.items())}
 
         except Exception as e:
             logger.error(f"ZillizSearch failed: {e}")
             return {}
-def prune_metadata_item(
-
-        meta: Dict,
-        remove_keys: Union[set, None] = None,
-        keep_keys: Union[set, None] = None,
-        in_place: bool = False
-    ) -> Tuple[Dict, Dict]:
-        """
-        Prune a single metadata dict.
-
-        Args:
-            meta: original metadata dict.
-            remove_keys: set of keys to remove (optional).
-            keep_keys: set of keys to KEEP (optional). If provided, removal is (all_keys - keep_keys).
-            in_place: if True, mutate meta; otherwise operate on a shallow copy.
-
-        Returns:
-            (pruned_meta, removed_fields) where removed_fields is a dict of popped key->value.
-        """
-        if not in_place:
-            meta = dict(meta)  # shallow copy
-
-        if keep_keys is not None:
-            # derive remove_keys from keys present in meta
-            remove_keys = set(meta.keys()) - set(keep_keys)
-        else:
-            remove_keys = set(remove_keys or ())
-
-        removed = {}
-        for k in list(remove_keys):
-            if k in meta:
-                removed[k] = meta.pop(k)
-
-        return meta, removed
-
-# def prune_metadata_batch(
-#         metas: Union[Dict, List[Dict]],
-#         remove_keys: Union[List[str], set, None] = None,
-#         keep_keys: Union[List[str], set, None] = None,
-#         in_place: bool = False
-#     ) -> Tuple[Union[Dict, List[Dict]], List[Dict]]:
-#         """
-#         Prune a single dict or list of dicts.
-
-#         Args:
-#             metas: dict or list of dicts.
-#             remove_keys: iterable of keys to remove (optional).
-#             keep_keys: iterable of keys to KEEP (optional). If provided, removal is (all_keys - keep_keys).
-#             in_place: if True, mutate items in-place when metas is a list; otherwise works on copies.
-
-#         Returns:
-#             (pruned_metas, removed_per_item) - pruned_metas is same type as input metas (dict or list of dicts).
-#             - removed_per_item is a list of dicts showing keys removed for each item (single-item case returns list with one dict).
-#         """
-#         rem = set(remove_keys) if remove_keys is not None else None
-#         keep = set(keep_keys) if keep_keys is not None else None
-
-#         if isinstance(metas, dict):
-#             p, r = prune_metadata_item(metas, remove_keys=rem, keep_keys=keep, in_place=in_place)
-#             return p, [r]
-
-#         pruned_list = []
-#         removed_list = []
-#         for item in metas:
-#             p, r = prune_metadata_item(item, remove_keys=rem, keep_keys=keep, in_place=in_place)
-#             pruned_list.append(p)
-#             removed_list.append(r)
-
-#         return pruned_list, removed_list
+# 

@@ -102,7 +102,7 @@ class SearchAgent:
                         'actions': 'extract_problems',
                         'content': query,  # Use original query directly
                         'evaluation_previous_goal': 'Success - Direct search optimization for first question',
-                        'challenges': 'None',
+                        'challenges': 'The whole user question was passed as the current sub-question that appears to lead to many results',
                         'think': 'Bypassing planner for performance optimization on first question'
                     }
                     

@@ -1,23 +1,24 @@
 from ..utils.utils import *
-from ..utils.cache import WebPageCache
+# from ..utils.cache import WebPageCache
 from ..models.basellm import GPTAPI, BaseStreamingAgent
-from ..tools.visitpage import VisitPage
-from concurrent.futures import ThreadPoolExecutor, as_completed 
-import os, ast
+# from ..tools.visitpage import VisitPage
+from concurrent.futures import ThreadPoolExecutor #, as_completed 
+# import os, ast
 import concurrent.futures
-import re
-from collections import defaultdict
-from typing import Dict, Tuple, List
+# import re
+# from collections import defaultdict
+# from typing import Dict, Tuple, List
 class Reader(BaseStreamingAgent):
-    def __init__(self, llm:GPTAPI, webpage_cache, summary_prompt, extract_prompt, search_api_key, proxy, **baseconfig):
+    def __init__(self, llm:GPTAPI, summary_prompt, extract_prompt, chat_prompt ,**baseconfig):
         self.llm = llm
         self.summary_prompt = summary_prompt
         self.extract_prompt = extract_prompt
+        self.chat_prompt = chat_prompt
         self.input_prompt = """## Date:{date}
         ## Title:{title}
         ## Content:{content}"""
-        self.visitpage = VisitPage(api_key=search_api_key, timeout=1, proxy=proxy)
-        self.webpage_cache = webpage_cache
+        # self.visitpage = VisitPage(api_key=search_api_key, timeout=1, proxy=proxy)
+        # self.webpage_cache = webpage_cache
 
         super().__init__(llm, **baseconfig)
 
@@ -67,15 +68,15 @@ class Reader(BaseStreamingAgent):
         
         # Handle single grouped result from ZillizSearch (all documents concatenated)
         for item in search_results.values():
-            url = item['intent']
+            url = item['url']
             url_to_chunks[url] = item['content']
             if 'content' not in item or not item['content']:
                 continue
-            chunked_str = '=========='.join([f"Chunk {key}:{value['content']}" for key, value in item['content'].items()])
+            chunked_str = '=========='.join([f"Chunk {key}:{value}" for key, value in item['content'].items()])
             # chunked_str = chunked_str[:16192]
             if 'title' not in item:
                 item['title'] = ""
-            content = self.input_prompt.format(date=item['date'], title=f"Results for intent: {item['intent']}", content=chunked_str)
+            content = self.input_prompt.format(date=item['date'], title=item['title'], content=chunked_str)
             chatbox=[
                 {"role": 'system', 'content': system_prompt},
                 {'role': 'user', 'content': content}
@@ -117,35 +118,12 @@ class Reader(BaseStreamingAgent):
                 llm_summs[key] = reader_json.get('related_information', '')
             except:
                 pass
-        
-        # Reformat search_results: add summary as "sum" field and flatten chunk metadata/scores
         for page in search_results.values():
-            if page['intent'] in llm_summs:
-                # Add the LLM summary as a new "sum" field at the top level
-                page['sum'] = llm_summs[page['intent']]
+            if page['url'] in llm_summs:
+                page['content'] = llm_summs[page['url']]
             else:
-                page['sum'] = ""
-            
-            # Flatten and rename: extract chunk metadata/scores and remove individual content fields
-            if 'content' in page and isinstance(page['content'], dict):
-                # Extract chunk metadata and scores, flatten to top level under sum
-                # chunks_metadata = {}
-                # for chunk_id, chunk_data in page['content'].items():
-                #     if isinstance(chunk_data, dict):
-                #         # Keep only metadata and score, remove content
-                #         chunk_meta = {}
-                #         if 'metadata' in chunk_data:
-                #             chunk_meta['metadata'] = chunk_data['metadata']
-                #         if 'score' in chunk_data:
-                #             chunk_meta['score'] = chunk_data['score']
-                #         chunks_metadata[chunk_id] = chunk_meta
-                
-                # # Replace 'content' with 'chunks' containing flattened metadata/scores
-                # page['chunks'] = chunks_metadata
-                del page['content']
-        
-        return search_results, None # {intent: {sum: summary, chunks: {chunk_id: {metadata, score}}}}
-
+                page['content'] = ""
+        return search_results, None # {url: {chunk_dict, scores}}
     def extract_text(self, tool_return):
         messages = {}
         for item in tool_return.values():
@@ -223,3 +201,44 @@ class Reader(BaseStreamingAgent):
         chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
         chunk_dict = {i: chunk for i, chunk in enumerate(chunks)}
         return chunk_dict
+    
+    def talker_chat(self, query, input_text, history):
+        """
+        Generate a conversational response using the Talker model.
+        
+        Args:
+            query: The current user query
+            input_text: The answer or think from ManuSearch
+            history: Formatted conversation history
+            
+        Returns:
+            Final conversational response
+        """
+        try:
+            # Format the conversation history
+            history_prompt = ""
+            if history:
+                history_prompt = f"CONVERSATION HISTORY:\n{history}\n\n"
+            
+            # Create the user message with query and input
+            user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input and conversation history."
+            
+            # Create chat messages
+            messages = [
+                {"role": "system", "content": self.chat_prompt},
+                {"role": "user", "content": user_content}
+            ]
+            
+            # Call the LLM
+            response = self.llm.chat(messages)
+            
+            # Extract the content
+            if hasattr(response, 'content'):
+                return response.content
+            else:
+                return str(response)
+                
+        except Exception as e:
+            print(f"Error in talker_chat: {e}")
+            # Fallback to input_text if Talker fails
+            return input_text
