@@ -111,6 +111,4 @@ When you execute “final_response”, you must strictly adhere to the following
 3. Be careful when performing numerical calculations.
 4. **LANGUAGE CONSISTENCY: Always maintain the same language as the user's question in your sub-questions, content, and final response. This is crucial for proper language flow.**
 
-Your response must always be in the specified JSON format.
-
 Your response must always be in the specified JSON format.""" 
