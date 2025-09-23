@@ -228,14 +228,14 @@ async def main_async():
     start_time = time.time()
 
     # Create semaphore for concurrent API calls
-    semaphore = asyncio.Semaphore(4)
+    semaphore = asyncio.Semaphore(2)
 
     try:
         # Process only the first question for testing
         tasks = [
             process_single_sequence(
                 agent=agent, message=question['question'],
-            ) for question in filtered_data[:50]
+            ) for question in filtered_data[:10]
         ]
 
         # Run all sequences concurrently with progress bar
@@ -254,9 +254,9 @@ async def main_async():
 
     t = time.localtime()
     random_num = str(random.randint(0, 99)).zfill(2)
-    result_json_name = f'{args.split}.{t.tm_mon}.{t.tm_mday},{t.tm_hour}:{t.tm_min}.{random_num}.json'
+    result_json_name = f'test.json'
 
-    for item, seq in zip(filtered_data[:50], completed_sequences):
+    for item, seq in zip(filtered_data[:10], completed_sequences):
         item['Output'] = seq['output']
         item['think'] = seq['think']  # Updated field name
         

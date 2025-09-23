@@ -781,7 +781,7 @@ class StreamingAgentMixin:
                 
                 # 工具调用tools
                 if isinstance(message.content, ChatCompletionMessage):
-                    if self.llm.model_type.lower().startswith("gemini"):
+                    if self.llm.model_type.lower().startswith("gemini") or self.llm.model_type.lower().startswith("qwen") or self.llm.model_type.lower().startswith("llama") or self.llm.model_type.lower().startswith("moonshotai") or self.llm.model_type.lower().startswith("deepseek") or self.llm.model_type.lower().startswith("mistral"):
                         message_dict = self.convert_one_message_to_dict(message.content)
                         _message.append(message_dict)
                     else:
