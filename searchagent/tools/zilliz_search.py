@@ -172,11 +172,12 @@ class ZillizSearch(BaseTool):
             # print(docs)
             for doc in docs:
                 raw_metadata = doc.get('metadata', {})
+                # print(raw_metadata)
                 content = doc.get('page_content', '').strip()
                 
                 # Get group key from metadata
-                group_key = raw_metadata.get('parent_page_url', raw_metadata.get('download_url'))
-                doc['title'] = raw_metadata.get('parent_page_title', raw_metadata.get('filename', ''))
+                group_key = raw_metadata.get('url', '')
+                doc['title'] = raw_metadata.get('title', '')
                 doc['content'] = content
                 doc['score'] = doc.get('score', 0.0)
                 # Prune metadata to keep only relevant fields
