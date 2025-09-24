@@ -235,7 +235,7 @@ async def main_async():
         tasks = [
             process_single_sequence(
                 agent=agent, message=question['question'],
-            ) for question in filtered_data[:10]
+            ) for question in filtered_data[:1]
         ]
 
         # Run all sequences concurrently with progress bar
@@ -256,7 +256,7 @@ async def main_async():
     random_num = str(random.randint(0, 99)).zfill(2)
     result_json_name = f'test.json'
 
-    for item, seq in zip(filtered_data[:10], completed_sequences):
+    for item, seq in zip(filtered_data[:1], completed_sequences):
         item['Output'] = seq['output']
         item['think'] = seq['think']  # Updated field name
         
