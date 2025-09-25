@@ -45,8 +45,7 @@ class Planner(BaseStreamingAgent):
 
         response = parse_resp_to_json(response.content)
         
-        if response.get('actions', '').strip().lower() == 'extract_problems':
-            print (response['content'])
+        if  isinstance(response, dict) and response.get('actions', '').strip().lower() == 'extract_problems':
             current_subquerys = recorder.update(
                 node_name=None,
                 node_content=None,
@@ -54,7 +53,7 @@ class Planner(BaseStreamingAgent):
                 memory=self.agent.memory,
                 sender='planner'
             )
-        elif response.get('actions', '').strip().lower() == 'final_response':
+        elif isinstance(response, dict) and response.get('actions', '').strip().lower() == 'final_response':
             recorder.update(
                 node_name = None,
                 node_content=None,

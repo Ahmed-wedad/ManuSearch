@@ -13,3 +13,4 @@ log/*
 nohup.out
 
 *.sh
+test*

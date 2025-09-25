@@ -94,53 +94,53 @@ class SearchAgent:
 
             for turn in range(self.max_turn):
                 # Optimization: Skip planner for first question in new conversations
-                if turn == 0 and skip_first_planner:
-                    logging.info('First question optimization: skipping planner, going directly to search...')
+                # if turn == 0 and skip_first_planner:
+                #     logging.info('First question optimization: skipping planner, going directly to search...')
                     
-                    # Create synthetic plan that mimics planner output for direct search
-                    current_plan = {
-                        'actions': 'extract_problems',
-                        'content': query,  # Use original query directly
-                        'evaluation_previous_goal': 'Success - Direct search optimization for first question',
-                        'challenges': 'The whole user question was passed as the current sub-question that appears to lead to many results',
-                        'think': 'Bypassing planner for performance optimization on first question'
-                    }
+                #     # Create synthetic plan that mimics planner output for direct search
+                #     current_plan = {
+                #         'actions': 'extract_problems',
+                #         'content': query,  # Use original query directly
+                #         'evaluation_previous_goal': 'Success - Direct search optimization for first question',
+                #         'challenges': 'The whole user question was passed as the current sub-question that appears to lead to many results',
+                #         'think': 'Bypassing planner for performance optimization on first question'
+                #     }
                     
-                    # CRITICAL: Create the graph nodes that the searcher expects
-                    # This simulates what the planner would normally do via recorder.update()
-                    new_nodes = self.recorder._construct_graph(current_plan['content'])
-                    self.recorder.container['memory']['planner'] = {}
+                #     # CRITICAL: Create the graph nodes that the searcher expects
+                #     # This simulates what the planner would normally do via recorder.update()
+                #     new_nodes = self.recorder._construct_graph(current_plan['content'])
+                #     self.recorder.container['memory']['planner'] = {}
                     
-                    # Yield the synthetic plan for logging/debugging
-                    yield {
-                        'plan': current_plan,
-                        'status': 'planning_optimized'
-                    }
+                #     # Yield the synthetic plan for logging/debugging
+                #     yield {
+                #         'plan': current_plan,
+                #         'status': 'planning_optimized'
+                #     }
                     
-                else:
-                    # Normal planner execution for subsequent turns
-                    logging.info('planner planning....')
-                    with timeit("Planner"):
+                # else:
+                # Normal planner execution for subsequent turns
+                logging.info('planner planning....')
+                with timeit("Planner"):
 
-                        message = planner_message.get()
-                        for response in self.planner.plan(
-                            message=message,
-                            recorder=self.recorder
-                        ):
-                            current_plan = parse_resp_to_json(response.content)
+                    message = planner_message.get()
+                    for response in self.planner.plan(
+                        message=message,
+                        recorder=self.recorder
+                    ):
+                        current_plan = parse_resp_to_json(response.content)
 
-                            if isinstance(current_plan, dict) and 'actions' in current_plan:
-                                if current_plan['actions'] == 'final_response':
-                                    yield {
-                                        'final_resp': current_plan,
-                                        'status': 'reasoning',
-                                        'ref2url': references_url # global index
-                                    }
-                                else:
-                                    yield {
-                                        'plan': current_plan,
-                                        'status': 'planning'
-                                    }
+                        if isinstance(current_plan, dict) and 'actions' in current_plan:
+                            if current_plan['actions'] == 'final_response':
+                                yield {
+                                    'final_resp': current_plan,
+                                    'status': 'reasoning',
+                                    'ref2url': references_url # global index
+                                }
+                            else:
+                                yield {
+                                    'plan': current_plan,
+                                    'status': 'planning'
+                                }
 
                 # Execute search and summarize results for each sub-query
                 
