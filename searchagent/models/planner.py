@@ -35,7 +35,6 @@ class Planner(BaseStreamingAgent):
         if isinstance(message, list):
             for m in message[:-1]:
                 self.agent.update_memory(m)
-            print(type(message[-1]))
             for response in super().forward(message[-1],session_id=session_id, **kwargs):
                 yield response
             
@@ -49,7 +48,7 @@ class Planner(BaseStreamingAgent):
             current_subquerys = recorder.update(
                 node_name=None,
                 node_content=None,
-                content=response['content'],
+                content=response['content'] if hasattr(response, 'content') else "",
                 memory=self.agent.memory,
                 sender='planner'
             )
@@ -57,7 +56,7 @@ class Planner(BaseStreamingAgent):
             recorder.update(
                 node_name = None,
                 node_content=None,
-                content=response['content'],
+                content=response['content'] if hasattr(response, 'content') else "",
                 memory=self.agent.memory,
                 sender='reasoner'
             )
