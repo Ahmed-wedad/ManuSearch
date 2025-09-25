@@ -797,7 +797,16 @@ class StreamingAgentMixin:
                         dict(role='assistant', content=str(message.content)))
             # 工具回答结果
             else:
-                _message.append(message)
+                if self.llm.model_type.lower().startswith("mistral") or self.llm.model_type.lower().startswith("magistral"):
+                    # formatted_content = ""
+                    # for key, result in message.items():
+                    #     formatted_content += f"{key}:\n"
+                    #     formatted_content += f"URL: {result['url']}\n"
+                    #     formatted_content += f"Title: {result['title']}\n"
+                    #     formatted_content += f"Content: {result['content']}\n\n"
+                    _message.append(str(message))
+                else:
+                    _message.append(message)
 
         return _message
         

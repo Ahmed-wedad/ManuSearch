@@ -85,11 +85,11 @@ Predicted Answer: {prediction}
     # Load the entire JSON file (not JSONL)
     with open(file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)  # Load as JSON array
-    
+    i=0
     for obj in data:
-
+            i+=1
             valid_num += 1
-            prediction = obj.get("Output", "I don't know")  # Use "Output" field as prediction
+            prediction = obj.get("Final_Answer", "I don't know")  # Use "Final_Answer" field as prediction
             if isinstance(prediction, dict):
                 prediction = prediction.get("content")
                 if isinstance(prediction, dict):
@@ -124,6 +124,8 @@ Predicted Answer: {prediction}
 
             # 将带有评判结果的对象加入到结果列表中
             result_data.append(obj)
+            if i>=10:
+                break
 
     # 计算准确率
     if valid_num > 0:

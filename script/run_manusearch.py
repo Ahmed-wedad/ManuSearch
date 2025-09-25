@@ -1,9 +1,7 @@
 import sys, os, json, time, random
 from zipfile import Path 
-import numpy as np
 import argparse
 import asyncio
-import aiohttp
 from tqdm import tqdm
 
 # Load environment variables from .env files (same as api_service_fastapi_legacy.py)
@@ -41,7 +39,7 @@ sys.path.append(project_root)
 # project_root = os.path.dirname(script_dir)
 # sys.path.insert(0, project_root)
 from src.services.manusearch_agent_manager import warm_up_manusearch, get_manusearch_agent, is_manusearch_ready
-
+from ManuSearch.searchagent.utils.utils import extract_answer_from_manusearch_result, normalize
 # from searchagent.agent.agent import AgentInterface
 
 def parse_args():
@@ -105,108 +103,8 @@ async def process_single_sequence(agent, message, history=None):
 async def main_async():
     # Parse arguments only when running as main script
     args = parse_args()
-    
-    # # Set random seed
-    # if args.seed is None:
-    #     args.seed = int(time.time())
-    # random.seed(args.seed)
-    # np.random.seed(args.seed)  
-
-    # # Set Search api
-    # search_api_keys = [key.strip() for key in args.google_subscription_key.split(",")]
-    # args.google_subscription_key = search_api_keys
-
-    # # Set ManuSearch agent 
-    # agent = AgentInterface(
-    #     google_subscription_key=args.google_subscription_key,
-    #     google_search_topk=args.google_search_topk,
-    #     proxy=args.proxy,
-    #     planner_model_name=args.planner_model_name,
-    #     planner_api_base=args.planner_api_base,
-    #     planner_api_key=args.planner_api_key,
-    #     searcher_model_name=args.searcher_model_name,
-    #     searcher_api_base=args.searcher_api_base,
-    #     searcher_api_key=args.searcher_api_key,
-    #     reader_model_name=args.reader_model_name,
-    #     reader_api_base=args.reader_api_base,
-    #     reader_api_key=args.reader_api_key,
-    #     my_cache_dir=args.cache_dir,
-    #     temperature=args.temperature,
-    #     top_p=args.top_p, 
-    #     min_p=args.min_p, 
-    #     top_k=args.top_k,
-    #     repetition_penalty=args.repetition_penalty, 
-    #     max_new_tokens=args.max_new_tokens,
-    #     searcher_same_parameters=args.searcher_same_parameters,
-    #     reader_same_parameters=args.reader_same_parameters
-    # )
-
-    # # Modified data loading section
-    # if args.single_question:
-    #     # Create a single item in the same format as dataset items
-    #     filtered_data = [{
-    #         'Question': args.single_question,
-    #     }]
-    #     args.dataset_name = 'custom'  # Set dataset name to custom for single questions
-    
-    # else:
-    #     # Original dataset loading logic
-    #     if args.dataset_name == 'GAIA':
-    #         data_path = f'../data/GAIA/{args.split}.json'
-    #     elif args.dataset_name == 'FRAMES':
-    #         data_path = f'../data/FRAMES/{args.split}.json'
-    #     elif args.dataset_name == 'ORION':
-    #         data_path = f'../data/ORION/{args.split}.json'
-    #     else:
-    #         data_path = f'../data/{args.dataset_name}.json'
-        
-    #     print('-----------------------')
-    #     print(f'Using {args.dataset_name} {args.split} set.')
-    #     print('-----------------------')
-
-
-    # # Define output directory
-    # if 'qwq' in args.planner_model_name.lower():
-    #     model_short_name = 'qwq'
-    #     if 'llama-8b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-llama-8b'
-    #     elif 'llama-70b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-llama-70b'
-    #     elif 'qwen-1.5b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-qwen-1.5b'
-    #     elif 'qwen-7b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-qwen-7b'
-    #     elif 'qwen-14b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-qwen-14b'
-    #     elif 'qwen-32b' in args.searcher_model_name.lower():
-    #         model_short_name = 'qwq-qwen-32b'
-
-    # elif 'deepseek' in args.planner_model_name.lower():
-    #     model_short_name = 'dpsk'
-    #     if 'llama-8b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-llama-8b'
-    #     elif 'llama-70b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-llama-70b'
-    #     elif 'qwen-1.5b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-qwen-1.5b'
-    #     elif 'qwen-7b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-qwen-7b'
-    #     elif 'qwen-14b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-qwen-14b'
-    #     elif 'qwen-32b' in args.searcher_model_name.lower():
-    #         model_short_name = 'dpsk-qwen-32b'
-
-    # else:
-    #     model_short_name = args.searcher_model_name.split('/')[-1].lower().replace('-instruct', '')
-
-    # output_dir = f'../outputs/{args.dataset_name}.{model_short_name}.manusearch'
-    # os.makedirs(output_dir, exist_ok=True)
-
-    
-    # if not args.single_question:
-        # Load and prepare data
-    
-        # Pre-warm ManuSearch agent
+   
+   
     try:
         if not is_manusearch_ready():
             warm_up_manusearch()
@@ -228,43 +126,61 @@ async def main_async():
     start_time = time.time()
 
     # Create semaphore for concurrent API calls
-    semaphore = asyncio.Semaphore(2)
+    semaphore = asyncio.Semaphore(1)
 
     try:
-        # Process only the first question for testing
-        tasks = [
-            process_single_sequence(
-                agent=agent, message=question['question'],
-            ) for question in filtered_data[:1]
-        ]
-
-        # Run all sequences concurrently with progress bar
-        with tqdm(total=len(tasks)) as pbar:
-            async def track_progress(task):
-                result = await task
+        # Process questions 5-10 sequentially with complete processing
+        reader = agent.reader
+        with tqdm(total=50) as pbar:
+            for item in filtered_data[:50]:
+                # Process the question through ManuSearch
+                seq = await process_single_sequence(
+                    agent=agent, message=item['question'],
+                )
+                
+                # Store raw results
+                item['Output'] = seq['output']
+                item['think'] = seq['think']  # Updated field name
+                
+                # Extract answer and think
+                answer = extract_answer_from_manusearch_result(seq)
+                think = normalize(seq.get('think'))
+                
+                # Determine input text: use answer if available, otherwise think
+                input_text = answer if answer else think
+                
+                # Call Talker to generate conversational response
+                talker_response = reader.talker_chat(
+                    query=item['question'],
+                    input_text=input_text,
+                )
+                
+                # Update answer with Talker's response
+                answer = talker_response
+                item['Final_Answer'] = answer
+                
                 pbar.update(1)
-                return result
-            
-            tracked_tasks = [track_progress(task) for task in tasks]
-            completed_sequences = await asyncio.gather(*tracked_tasks)
     finally:
-        pass
+        total_time = time.time() - start_time
 
+        t = time.localtime()
+        random_num = str(random.randint(0, 99)).zfill(2)
+        result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
+            
+        with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
+            json.dump(filtered_data[:50], json_file, indent=4, ensure_ascii=False)
+    
     total_time = time.time() - start_time
 
     t = time.localtime()
     random_num = str(random.randint(0, 99)).zfill(2)
-    result_json_name = f'test.json'
-
-    for item, seq in zip(filtered_data[:1], completed_sequences):
-        item['Output'] = seq['output']
-        item['think'] = seq['think']  # Updated field name
+    result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
         
     with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-        json.dump(filtered_data, json_file, indent=4, ensure_ascii=False)
+        json.dump(filtered_data[:50], json_file, indent=4, ensure_ascii=False)
 
 
-    print("Process completed.")
+    print(f"Process completed. Results saved to {result_json_name} in {total_time:.2f} seconds.")
 
 def main():
     asyncio.run(main_async())

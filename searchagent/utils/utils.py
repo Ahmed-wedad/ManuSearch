@@ -198,3 +198,76 @@ def parse_keys(score_dict:dict)->dict:
                 raise ValueError(f"chunk 划分错误")
     parsed_score_dict = {new_key: score_dict[ori_key] for new_key, ori_key in zip(new_keys, original_keys)}
     return parsed_score_dict
+def extract_answer_from_manusearch_result(result: Dict[str, Any]) -> str:
+    """
+    Extract the final answer from ManuSearch process_single_sequence result.
+    
+    Args:
+        result: The result dictionary returned by process_single_sequence
+        
+    Returns:
+        The extracted answer string
+    """
+    if not result:
+        return ""
+    
+    # Extract and normalize results based on process_single_sequence return format
+    # Using the same algorithm as in optimized_rag_chain.py query method
+
+    
+    # Get the raw results
+    output = result.get('output', "")
+    
+    # Parse the output to extract the actual answer using the same algorithm as query method
+    final_answer = ""
+    if output:
+        try:
+            # The output might be a string representation of the final_resp dict
+            # Try to parse it to extract the actual content
+            import json
+            import ast
+            
+            # First try to parse as JSON
+            try:
+                if isinstance(output, str) and (output.startswith('{') or output.startswith('[')):
+                    output_dict = json.loads(output)
+                else:
+                    output_dict = output
+            except json.JSONDecodeError:
+                # Try with ast.literal_eval for Python dict strings
+                try:
+                    if isinstance(output, str):
+                        output_dict = ast.literal_eval(output)
+                    else:
+                        output_dict = output
+                except:
+                    output_dict = None
+            
+            # Extract the content from the final_resp structure
+            if isinstance(output_dict, dict):
+                # Check if this is a final_response structure
+                if 'content' in output_dict and isinstance(output_dict['content'], dict):
+                    content = output_dict['content']
+                    final_answer = content.get('detailed_answer', '') or content.get('concise_answer', '')
+                # Check if this is direct content structure
+                elif 'detailed_answer' in output_dict or 'concise_answer' in output_dict:
+                    final_answer = output_dict.get('detailed_answer', '') or output_dict.get('concise_answer', '')
+                else:
+                    # Fallback to string representation
+                    final_answer = str(output_dict)
+            else:
+                # Use output as-is if not a dict
+                final_answer = str(output) if output else ""
+                
+        except Exception:
+            # Fallback: use output as-is
+            final_answer = str(output) if output else ""
+    
+    # Use final_answer as the main result, with think as fallback
+    # This follows the same logic as the query method
+    return final_answer if final_answer else ""
+
+def normalize(v):
+    if v is None:
+        return ""
+    return v if isinstance(v, str) else str(v)

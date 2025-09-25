@@ -19,8 +19,7 @@ KEEP = {
     "document_id",
     "chunk_size",
     "chunk_timestamp",
-    "parent_page_url",
-    "filename"
+    "parent_section",
 }
 
 
@@ -194,8 +193,8 @@ class ZillizSearch(BaseTool):
             return { key : {
                     'url': url,
                     'date': datetime.now().strftime("%Y-%m-%d"),
-                    'title': docs_list[0]['title'] if docs_list else '',
-                    'content': {idx:doc['content'] for idx, doc in enumerate(sorted([d for d in docs_list if 'content' in d], key=lambda x: x['score'], reverse=True))}
+                    'title':  docs_list[0]['metadata']['path_after_fr'] if docs_list else '',
+                    'content': {idx:doc['content'] for idx, doc in enumerate(sorted([d for d in docs_list if 'content' in d], key=lambda x: x['score'], reverse=True))},
                 } for key, (url, docs_list) in enumerate(url_groups.items())}
 
         except Exception as e:

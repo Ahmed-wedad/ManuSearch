@@ -202,7 +202,7 @@ class Reader(BaseStreamingAgent):
         chunk_dict = {i: chunk for i, chunk in enumerate(chunks)}
         return chunk_dict
     
-    def talker_chat(self, query, input_text, history):
+    def talker_chat(self, query, input_text, history=None):
         """
         Generate a conversational response using the Talker model.
         
@@ -217,12 +217,14 @@ class Reader(BaseStreamingAgent):
         try:
             # Format the conversation history
             history_prompt = ""
+            user_content=""
             if history:
                 history_prompt = f"CONVERSATION HISTORY:\n{history}\n\n"
             
-            # Create the user message with query and input
-            user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input and conversation history."
-            
+                # Create the user message with query and input
+                user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input and conversation history."
+            else:
+                user_content = f"CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input."
             # Create chat messages
             messages = [
                 {"role": "system", "content": self.chat_prompt},

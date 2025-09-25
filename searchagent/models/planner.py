@@ -35,7 +35,7 @@ class Planner(BaseStreamingAgent):
         if isinstance(message, list):
             for m in message[:-1]:
                 self.agent.update_memory(m)
-
+            print(type(message[-1]))
             for response in super().forward(message[-1],session_id=session_id, **kwargs):
                 yield response
             
@@ -46,6 +46,7 @@ class Planner(BaseStreamingAgent):
         response = parse_resp_to_json(response.content)
         
         if response.get('actions', '').strip().lower() == 'extract_problems':
+            print (response['content'])
             current_subquerys = recorder.update(
                 node_name=None,
                 node_content=None,

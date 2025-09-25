@@ -138,7 +138,7 @@ class Searcher(BaseStreamingAgent):
                             for tool in response.content.tool_calls:
                                 name = get_tool_name(tool)
                                 tools_in_resp.append(name)
-                                if name == 'final_answer' and turn == 0 and ('visitpage' in tools_in_resp or 'ZillizSearch' in tools_in_resp):
+                                if name == 'final_answer' and turn == 0 and ('ZillizSearch' in tools_in_resp):
                                     ignore = True
                                     continue
                                 arg = get_tool_arg(tool)
@@ -201,10 +201,10 @@ class Searcher(BaseStreamingAgent):
                                 if isinstance(cur_url_to_chunk_score, dict):
                                     self.url_to_chunk_score.update(cur_url_to_chunk_score)
                                 # web info return to LLM: {url, title, summ, date}
-                                web_result = {k: {key: val for key, val in v.items()} for k, v in search_results.items()}
+                                web_result = {k: {key: val for key, val in v.items() } for k, v in search_results.items()}
                                 result = json.dumps(web_result, ensure_ascii=False)
                                 recorder.update(
-                                    node_name=question,
+                                    node_name=question if isinstance(question , str ) else [question.values()][0],
                                     node_content=args.get('query', ""),
                                     content=web_result,
                                     memory=self.agent.memory,
@@ -228,6 +228,7 @@ class Searcher(BaseStreamingAgent):
                                         memory=self.agent.memory,
                                         sender='searcher_response'
                                     )
+                                    
                                     return references
                                 else:
                                     messages.append({

@@ -125,6 +125,8 @@ class Recorder:
                     nodes.extend(v)
                 elif isinstance(v, str):
                     nodes.append(v)
+                elif isinstance(v, dict):
+                    nodes.extend([value for value in v.values()])
                 else:
                     raise ValueError('UNSUPPORTED DATA TYPE')
         elif isinstance(message, list):
