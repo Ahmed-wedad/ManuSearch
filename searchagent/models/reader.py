@@ -208,7 +208,7 @@ class Reader(BaseStreamingAgent):
         
         Args:
             query: The current user query
-            input_text: The answer or think from ManuSearch
+            input_text: The thinking/reasoning process from ManuSearch (not the final answer)
             history: Formatted conversation history
             
         Returns:
@@ -222,9 +222,9 @@ class Reader(BaseStreamingAgent):
                 history_prompt = f"CONVERSATION HISTORY:\n{history}\n\n"
             
                 # Create the user message with query and input
-                user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input and conversation history."
+                user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nMANUSEARCH THINKING PROCESS: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch thinking process and conversation history."
             else:
-                user_content = f"CURRENT QUERY: {query}\n\nINPUT FROM MANUSEARCH: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch input."
+                user_content = f"CURRENT QUERY: {query}\n\nMANUSEARCH THINKING PROCESS: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch thinking process."
             # Create chat messages
             messages = [
                 {"role": "system", "content": self.chat_prompt},

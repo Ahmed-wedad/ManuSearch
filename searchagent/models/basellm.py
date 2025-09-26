@@ -570,8 +570,8 @@ class GPTAPI(BaseAPILLM):
                     )
                     return streaming(response, has_tool=True)
                 else:
-                    if  self.model_type.lower().startswith("magistral") or self.model_type.lower().startswith("mistral"):
-                     print(messages[-1])
+                    # if  self.model_type.lower().startswith("magistral") or self.model_type.lower().startswith("mistral"):
+                    #  print(messages[-1])
                     response = openai.chat.completions.create(
                         messages=messages,
                         **data
@@ -790,8 +790,7 @@ class StreamingAgentMixin:
 
                 # 用户问题
                 elif message.sender == 'user' or message.sender == 'searcher' :
-                    if self.llm.model_type.lower().startswith("mistral") and message.sender=='searcher' and not isinstance(message
-.content, str):
+                    if (self.llm.model_type.lower().startswith("mistral") or self.llm.model_type.lower().startswith("llama")) and message.sender=='searcher' and not isinstance(message.content, str):
                         formatted_content = ""
                         for key, result in message.content.items():
                                 formatted_content += f"{key}:\n"

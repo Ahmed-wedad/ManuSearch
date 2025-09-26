@@ -81,9 +81,10 @@ Predicted Answer: {prediction}
     correct_num = 0
     incorrect_num = 0
     result_data = []  # 用来存储每个对象的处理结果
-
+    i=0
     with open(file_path, 'r', encoding='utf-8') as f:
         for line in f:
+            i+=1
             try:
                 obj = json.loads(line)
             except json.JSONDecodeError:
@@ -91,15 +92,15 @@ Predicted Answer: {prediction}
                 continue
 
             valid_num += 1
-            prediction = obj.get("answer", "I don't know")
-            if isinstance(prediction, dict):
-                prediction = prediction.get("content")
-                if isinstance(prediction, dict):
-                    prediction=prediction.get("concise_answer","")
-            else:
-                prediction = remove_think_tags(prediction)
+            prediction = obj.get("Final_Answer", "I don't know")
+            # if isinstance(prediction, dict):
+            #     prediction = prediction.get("content")
+            #     if isinstance(prediction, dict):
+            #         prediction=prediction.get("concise_answer","")
+            # else:
+            #     prediction = remove_think_tags(prediction)
             question = obj.get("question", "")
-            answer = obj.get("gold", [])
+            answer = obj.get("answer", [])
             print("=="*70)
             print("Question:",question)
             print(prediction)
@@ -126,6 +127,8 @@ Predicted Answer: {prediction}
 
             # 将带有评判结果的对象加入到结果列表中
             result_data.append(obj)
+            if i==10:
+                break
 
     # 计算准确率
     if valid_num > 0:

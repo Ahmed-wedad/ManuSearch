@@ -84,7 +84,7 @@ async def process_single_sequence(agent, message, history=None):
     loop = asyncio.get_event_loop()
     steps = await loop.run_in_executor(
         None,  # Default thread pool
-        lambda: list(agent.get_answer(message, solve_method='iterative'))  # Convert to list to avoid generator problems
+        lambda: list(agent.get_answer(message, solve_method='iterative',history=history))  # Convert to list to avoid generator problems
     )
 
     for step in steps:
@@ -121,6 +121,9 @@ async def main_async():
             if line:  # Skip empty lines
                 filtered_data.append(json.loads(line))  # ✅ Parse each line as JSON
 
+    # Shuffle the dataset
+    random.shuffle(filtered_data)
+
     # Initialize batch output records
     batch_output_records = []
     start_time = time.time()
@@ -131,28 +134,28 @@ async def main_async():
     try:
         # Process questions 5-10 sequentially with complete processing
         reader = agent.reader
-        with tqdm(total=50) as pbar:
-            for item in filtered_data[:50]:
+        with tqdm(total=100) as pbar:
+            for item in filtered_data[:100]:
                 # Process the question through ManuSearch
                 seq = await process_single_sequence(
                     agent=agent, message=item['question'],
                 )
                 
                 # Store raw results
-                item['Output'] = seq['output']
-                item['think'] = seq['think']  # Updated field name
+                # item['Output'] = seq['output']
+                # item['think'] = seq['think']  # Updated field name
                 
                 # Extract answer and think
-                answer = extract_answer_from_manusearch_result(seq)
+                # answer = extract_answer_from_manusearch_result(seq)
                 think = normalize(seq.get('think'))
                 
                 # Determine input text: use answer if available, otherwise think
-                input_text = answer if answer else think
+                # input_text = answer if answer else think
                 
                 # Call Talker to generate conversational response
                 talker_response = reader.talker_chat(
                     query=item['question'],
-                    input_text=input_text,
+                    input_text=think,
                 )
                 
                 # Update answer with Talker's response
@@ -168,7 +171,7 @@ async def main_async():
         result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
             
         with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-            json.dump(filtered_data[:50], json_file, indent=4, ensure_ascii=False)
+            json.dump(filtered_data[:100], json_file, indent=4, ensure_ascii=False)
     
     total_time = time.time() - start_time
 
@@ -177,7 +180,7 @@ async def main_async():
     result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
         
     with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-        json.dump(filtered_data[:50], json_file, indent=4, ensure_ascii=False)
+        json.dump(filtered_data[:1], json_file, indent=4, ensure_ascii=False)
 
 
     print(f"Process completed. Results saved to {result_json_name} in {total_time:.2f} seconds.")
