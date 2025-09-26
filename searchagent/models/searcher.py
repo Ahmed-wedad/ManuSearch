@@ -222,7 +222,7 @@ class Searcher(BaseStreamingAgent):
                                     self.ptr+=len(references_url)
                                     result = resp
                                     recorder.update(
-                                        node_name=question,
+                                        node_name=question if isinstance(question , str ) else [question.values()][0],
                                         node_content=None,
                                         content= references,
                                         memory=self.agent.memory,

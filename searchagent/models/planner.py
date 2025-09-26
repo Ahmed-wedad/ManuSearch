@@ -48,7 +48,7 @@ class Planner(BaseStreamingAgent):
             current_subquerys = recorder.update(
                 node_name=None,
                 node_content=None,
-                content=response['content'] if hasattr(response, 'content') else "",
+                content=response['content'] if 'content' in response else "",
                 memory=self.agent.memory,
                 sender='planner'
             )
@@ -56,7 +56,7 @@ class Planner(BaseStreamingAgent):
             recorder.update(
                 node_name = None,
                 node_content=None,
-                content=response['content'] if hasattr(response, 'content') else "",
+                content=response['content'] if 'content' in response else "",
                 memory=self.agent.memory,
                 sender='reasoner'
             )
