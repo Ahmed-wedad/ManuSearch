@@ -204,7 +204,7 @@ class Searcher(BaseStreamingAgent):
                                 web_result = {k: {key: val for key, val in v.items() } for k, v in search_results.items()}
                                 result = json.dumps(web_result, ensure_ascii=False)
                                 recorder.update(
-                                    node_name=question if isinstance(question , str ) else [question.values()][0],
+                                    node_name=question if isinstance(question , str ) else [v for v in question.values()][-1],
                                     node_content=args.get('query', ""),
                                     content=web_result,
                                     memory=self.agent.memory,

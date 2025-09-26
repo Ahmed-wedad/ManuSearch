@@ -43,23 +43,26 @@ class Planner(BaseStreamingAgent):
                 yield response
 
         response = parse_resp_to_json(response.content)
-        
-        if  isinstance(response, dict) and response.get('actions', '').strip().lower() == 'extract_problems':
-            current_subquerys = recorder.update(
-                node_name=None,
-                node_content=None,
-                content=response['content'] if 'content' in response else "",
-                memory=self.agent.memory,
-                sender='planner'
-            )
-        elif isinstance(response, dict) and response.get('actions', '').strip().lower() == 'final_response':
-            recorder.update(
-                node_name = None,
-                node_content=None,
-                content=response['content'] if 'content' in response else "",
-                memory=self.agent.memory,
-                sender='reasoner'
-            )
+        if  isinstance(response, dict) and 'content' in response:
+            if   response.get('actions', '').strip().lower() == 'extract_problems':
+                current_subquerys = recorder.update(
+                    node_name=None,
+                    node_content=None,
+                    content=response['content'],
+                    memory=self.agent.memory,
+                    sender='planner'
+                )
+            elif response.get('actions', '').strip().lower() == 'final_response':
+                recorder.update(
+                    node_name = None,
+                    node_content=None,
+                    content=response['content'] if 'content' in response else "",
+                    memory=self.agent.memory,
+                    sender='reasoner'
+                )
+        elif "evaluation_previous_goal" in response:
+            step_message = f"Error: {response['evaluation_previous_goal']}."
+            self.agent.update_memory(step_message)
 
         return 
     
