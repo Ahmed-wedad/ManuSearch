@@ -570,7 +570,8 @@ class GPTAPI(BaseAPILLM):
                     )
                     return streaming(response, has_tool=True)
                 else:
-                    # print(messages)
+                    if  self.model_type.lower().startswith("magistral") or self.model_type.lower().startswith("mistral"):
+                     print(messages[-1])
                     response = openai.chat.completions.create(
                         messages=messages,
                         **data
@@ -789,24 +790,34 @@ class StreamingAgentMixin:
 
                 # 用户问题
                 elif message.sender == 'user' or message.sender == 'searcher' :
-                    _message.append(dict(role='user', content=message.content))
-                
+                    if self.llm.model_type.lower().startswith("mistral") and message.sender=='searcher' and not isinstance(message
+.content, str):
+                        formatted_content = ""
+                        for key, result in message.content.items():
+                                formatted_content += f"{key}:\n"
+                                formatted_content += f"URL: {result['url']}\n"
+                                formatted_content += f"Title: {result['title']}\n"
+                                formatted_content += f"Content: {result['content']}\n\n"
+                        _message.append(dict(role='user', content=formatted_content))
+                    else:
+                            _message.append(dict(role='user', content=message.content))
+
                 # 模型回答
                 else:
                     _message.append(
                         dict(role='assistant', content=str(message.content)))
             # 工具回答结果
             else:
-                if self.llm.model_type.lower().startswith("mistral") or self.llm.model_type.lower().startswith("magistral"):
-                    # formatted_content = ""
-                    # for key, result in message.items():
-                    #     formatted_content += f"{key}:\n"
-                    #     formatted_content += f"URL: {result['url']}\n"
-                    #     formatted_content += f"Title: {result['title']}\n"
-                    #     formatted_content += f"Content: {result['content']}\n\n"
-                    _message.append(str(message))
-                else:
-                    _message.append(message)
+                # if self.llm.model_type.lower().startswith("mistral") or self.llm.model_type.lower().startswith("magistral"):
+                #     # formatted_content = ""
+                #     # for key, result in message.items():
+                #     #     formatted_content += f"{key}:\n"
+                #     #     formatted_content += f"URL: {result['url']}\n"
+                #     #     formatted_content += f"Title: {result['title']}\n"
+                #     #     formatted_content += f"Content: {result['content']}\n\n"
+                #     _message.append(str(message))
+                # else:
+                _message.append(message)
 
         return _message
         

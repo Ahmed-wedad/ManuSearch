@@ -145,16 +145,16 @@ class Searcher(BaseStreamingAgent):
                                 resp = parse_resp_to_json(arg)
                                 if resp and isinstance(resp, dict):
                                     if name == 'final_answer':
-                                        if recorder.container['content'].nodes[question]['memory']:
+                                        if recorder.container['content'].nodes[question if isinstance(question , str ) else [v for v in question.values()][-1]]['memory']:
                                             references, references_url = self._generate_references_from_graph(
                                                 response=resp.get('answer', ''),
-                                                ref2url=recorder.container['content'].nodes[question]['memory'],
+                                                ref2url=recorder.container['content'].nodes[question if isinstance(question , str ) else [v for v in question.values()][-1]]['memory'],
                                             )
                                         else:
                                             references, references_url = resp, {}
 
                                         recorder.update(
-                                            node_name=question,
+                                            node_name=question if isinstance(question , str ) else [v for v in question.values()][-1],
                                             node_content=None,
                                             content= references,
                                             memory=None,

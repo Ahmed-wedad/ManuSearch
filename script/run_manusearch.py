@@ -3,7 +3,6 @@ from zipfile import Path
 import argparse
 import asyncio
 from tqdm import tqdm
-
 # Load environment variables from .env files (same as api_service_fastapi_legacy.py)
 try:
     from dotenv import load_dotenv
@@ -29,6 +28,7 @@ try:
 except ImportError:
     print("[WARNING] python-dotenv not installed, using system environment variables only")
     print("   Install with: pip install python-dotenv")
+
 
 p1 = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(p1)

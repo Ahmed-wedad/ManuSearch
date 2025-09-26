@@ -82,14 +82,16 @@ Predicted Answer: {prediction}
     incorrect_num = 0
     result_data = []  # 用来存储每个对象的处理结果
 
-    # Load the entire JSON file (not JSONL)
     with open(file_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)  # Load as JSON array
-    i=0
-    for obj in data:
-            i+=1
+        for line in f:
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                print(line)
+                continue
+
             valid_num += 1
-            prediction = obj.get("Final_Answer", "I don't know")  # Use "Final_Answer" field as prediction
+            prediction = obj.get("answer", "I don't know")
             if isinstance(prediction, dict):
                 prediction = prediction.get("content")
                 if isinstance(prediction, dict):
@@ -97,7 +99,7 @@ Predicted Answer: {prediction}
             else:
                 prediction = remove_think_tags(prediction)
             question = obj.get("question", "")
-            answer = obj.get("answer", [])  # Use "answer" field as golden answer
+            answer = obj.get("gold", [])
             print("=="*70)
             print("Question:",question)
             print(prediction)
@@ -124,8 +126,6 @@ Predicted Answer: {prediction}
 
             # 将带有评判结果的对象加入到结果列表中
             result_data.append(obj)
-            if i>=10:
-                break
 
     # 计算准确率
     if valid_num > 0:
@@ -140,10 +140,11 @@ Predicted Answer: {prediction}
     print(f"Incorrect objects: {incorrect_num}")
     print(f"Accuracy: {accuracy:.2f}%\n")
 
-    # 保存到新的JSON文件，名称与原文件相同
-    output_file_path = file_path.replace('.json', '_with_check_ans.json')
+    # 保存到新的JSONL文件，名称与原文件相同
+    output_file_path = file_path.replace('.jsonl', '_with_check_ans.jsonl')
     with open(output_file_path, 'w', encoding='utf-8') as output_file:
-        json.dump(result_data, output_file, indent=4, ensure_ascii=False)
+        for obj in result_data:
+            output_file.write(json.dumps(obj, ensure_ascii=False) + '\n')
     # break
 
 
