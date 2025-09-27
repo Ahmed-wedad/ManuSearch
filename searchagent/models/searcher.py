@@ -105,9 +105,9 @@ class Searcher(BaseStreamingAgent):
             ]
 
             return nodes['root']['content'], parent_response
-        
-        topic, history = prepare_search(node_name=question, recorder=recorder)
-        message = [self.user_input_template.format(question=question)]
+
+        topic, history = prepare_search(node_name=question if isinstance(question, str) else [v for v in question.values()][-1], recorder=recorder)
+        message = [self.user_input_template.format(question= question if isinstance(question, str) else [v for v in question.values()][-1], topic=topic)]
         if history and self.user_context_template:
             message = [self.user_context_template.format_map(item) for item in history] + message
         message = "\n".join(message)
@@ -222,7 +222,7 @@ class Searcher(BaseStreamingAgent):
                                     self.ptr+=len(references_url)
                                     result = resp
                                     recorder.update(
-                                        node_name=question if isinstance(question , str ) else [question.values()][0],
+                                        node_name=question if isinstance(question , str ) else [v for v in question.values()][0],
                                         node_content=None,
                                         content= references,
                                         memory=self.agent.memory,

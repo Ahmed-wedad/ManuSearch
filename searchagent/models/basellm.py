@@ -782,7 +782,7 @@ class StreamingAgentMixin:
                 
                 # 工具调用tools
                 if isinstance(message.content, ChatCompletionMessage):
-                    if self.llm.model_type.lower().startswith("gemini") or self.llm.model_type.lower().startswith("qwen") or self.llm.model_type.lower().startswith("llama"):
+                    if self.llm.model_type.lower().startswith("gemini") or self.llm.model_type.lower().startswith("qwen") or self.llm.model_type.lower().startswith("llama") or self.llm.model_type.lower().startswith("moonshot"):
                         message_dict = self.convert_one_message_to_dict(message.content)
                         _message.append(message_dict)
                     else:
@@ -803,6 +803,8 @@ class StreamingAgentMixin:
 
                 # 模型回答
                 else:
+                #    if  self.llm.model_type.lower().startswith("moonshot"):
+
                     _message.append(
                         dict(role='assistant', content=str(message.content)))
             # 工具回答结果

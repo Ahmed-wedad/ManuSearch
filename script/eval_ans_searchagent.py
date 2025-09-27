@@ -81,17 +81,34 @@ Predicted Answer: {prediction}
     correct_num = 0
     incorrect_num = 0
     result_data = []  # 用来存储每个对象的处理结果
-    i=0
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            i+=1
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError:
-                print(line)
-                continue
-
-            valid_num += 1
+    
+    # Load data based on file format
+    objects = []
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            if file_path.endswith('.json'):
+                # Handle JSON array format
+                data = json.load(f)
+                objects = data if isinstance(data, list) else [data]
+                print(f"Loaded {len(objects)} objects from JSON array file")
+            else:
+                # Handle JSONL format (one JSON object per line)
+                for line in f:
+                    line = line.strip()
+                    if line:  # Skip empty lines
+                        try:
+                            obj = json.loads(line)
+                            objects.append(obj)
+                        except json.JSONDecodeError as e:
+                            print(f"Skipping invalid JSON line: {line[:100]}... Error: {e}")
+                            continue
+                print(f"Loaded {len(objects)} objects from JSONL file")
+    except Exception as e:
+        print(f"Error loading file {file_path}: {e}")
+        return
+    valid_num = len(objects)
+    # Process each object
+    for obj in objects:
             prediction = obj.get("Final_Answer", "I don't know")
             # if isinstance(prediction, dict):
             #     prediction = prediction.get("content")
@@ -127,8 +144,7 @@ Predicted Answer: {prediction}
 
             # 将带有评判结果的对象加入到结果列表中
             result_data.append(obj)
-            if i==10:
-                break
+           
 
     # 计算准确率
     if valid_num > 0:
@@ -144,7 +160,8 @@ Predicted Answer: {prediction}
     print(f"Accuracy: {accuracy:.2f}%\n")
 
     # 保存到新的JSONL文件，名称与原文件相同
-    output_file_path = file_path.replace('.jsonl', '_with_check_ans.jsonl')
+    base_name = os.path.splitext(file_path)[0]  # Remove extension
+    output_file_path = f"{base_name}_with_check_ans.jsonl"
     with open(output_file_path, 'w', encoding='utf-8') as output_file:
         for obj in result_data:
             output_file.write(json.dumps(obj, ensure_ascii=False) + '\n')

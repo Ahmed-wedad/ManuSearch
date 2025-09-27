@@ -86,7 +86,7 @@ class Reader(BaseStreamingAgent):
 
         with timeit("reader llm summ"):
             url2summ = {}
-            with ThreadPoolExecutor(max_workers=20) as executor:
+            with ThreadPoolExecutor(max_workers=1) as executor:
                 future_to_url = {
                     executor.submit(self.llm.chat, chatbox): url
                     for url, chatbox in messages.items()
@@ -202,7 +202,7 @@ class Reader(BaseStreamingAgent):
         chunk_dict = {i: chunk for i, chunk in enumerate(chunks)}
         return chunk_dict
     
-    def talker_chat(self, query, input_text, history=None):
+    def talker_chat(self, query, input_text, history=None,answer=None):
         """
         Generate a conversational response using the Talker model.
         
@@ -216,21 +216,14 @@ class Reader(BaseStreamingAgent):
         """
         try:
             # Format the conversation history
-            history_prompt = ""
-            user_content=""
-            if history:
-                history_prompt = f"CONVERSATION HISTORY:\n{history}\n\n"
-            
-                # Create the user message with query and input
-                user_content = f"{history_prompt}CURRENT QUERY: {query}\n\nMANUSEARCH THINKING PROCESS: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch thinking process and conversation history."
-            else:
-                user_content = f"CURRENT QUERY: {query}\n\nMANUSEARCH THINKING PROCESS: {input_text}\n\nPlease provide a natural, conversational response based on the ManuSearch thinking process."
-            # Create chat messages
+            history_prompt = []
             messages = [
                 {"role": "system", "content": self.chat_prompt},
-                {"role": "user", "content": user_content}
+                {"role": "system", "content": f"reasoning: {input_text}"},
             ]
-            
+            if history:
+                messages.extend(history)
+            messages.append({"role": "user", "content": query})
             # Call the LLM
             response = self.llm.chat(messages)
             

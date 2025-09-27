@@ -115,14 +115,14 @@ async def main_async():
         # logging.warning(f"⚠️ Could not pre-warm ManuSearch agent: {e}")
         raise
     filtered_data = []
-    with open("ManuSearch/data/enetcom_evaluation_dataset.jsonl", 'r', encoding='utf-8') as json_file:
+    with open("ManuSearch/data/admin_admission_subset.jsonl", 'r', encoding='utf-8') as json_file:
         for line in json_file:
             line = line.strip()
             if line:  # Skip empty lines
                 filtered_data.append(json.loads(line))  # ✅ Parse each line as JSON
 
     # Shuffle the dataset
-    random.shuffle(filtered_data)
+    # random.shuffle(filtered_data)
 
     # Initialize batch output records
     batch_output_records = []
@@ -134,8 +134,8 @@ async def main_async():
     try:
         # Process questions 5-10 sequentially with complete processing
         reader = agent.reader
-        with tqdm(total=100) as pbar:
-            for item in filtered_data[:100]:
+        with tqdm(total=83) as pbar:
+            for item in filtered_data[18:100]:
                 # Process the question through ManuSearch
                 seq = await process_single_sequence(
                     agent=agent, message=item['question'],
@@ -146,16 +146,24 @@ async def main_async():
                 # item['think'] = seq['think']  # Updated field name
                 
                 # Extract answer and think
-                # answer = extract_answer_from_manusearch_result(seq)
+                answer = extract_answer_from_manusearch_result(seq)
                 think = normalize(seq.get('think'))
                 
+                # Truncate think process if it's too long for model context (131072 tokens max)
+                # Rough estimate: ~4 chars per token, so limit to ~100k chars for safety
+                max_chars = 100000
+                if len(think) > max_chars:
+                    # Truncate from the end, keeping the most recent reasoning
+                    think = "..." + think[-max_chars:]
+                    print(f"[WARNING] Think process truncated to {max_chars} characters to fit model context")
+                
                 # Determine input text: use answer if available, otherwise think
-                # input_text = answer if answer else think
+                # input_text = answer if answer else ""
                 
                 # Call Talker to generate conversational response
                 talker_response = reader.talker_chat(
                     query=item['question'],
-                    input_text=think,
+                    input_text=think
                 )
                 
                 # Update answer with Talker's response
@@ -163,6 +171,9 @@ async def main_async():
                 item['Final_Answer'] = answer
                 
                 pbar.update(1)
+                
+                # Sleep between iterations to avoid rate limiting
+                await asyncio.sleep(10)
     finally:
         total_time = time.time() - start_time
 
@@ -171,8 +182,8 @@ async def main_async():
         result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
             
         with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-            json.dump(filtered_data[:100], json_file, indent=4, ensure_ascii=False)
-    
+            json.dump(filtered_data[18:100], json_file, indent=4, ensure_ascii=False)
+
     total_time = time.time() - start_time
 
     t = time.localtime()
@@ -180,7 +191,7 @@ async def main_async():
     result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
         
     with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-        json.dump(filtered_data[:1], json_file, indent=4, ensure_ascii=False)
+        json.dump(filtered_data[18:100], json_file, indent=4, ensure_ascii=False)
 
 
     print(f"Process completed. Results saved to {result_json_name} in {total_time:.2f} seconds.")
