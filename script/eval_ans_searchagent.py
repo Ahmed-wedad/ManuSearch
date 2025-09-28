@@ -9,6 +9,41 @@ import json
 import re
 from openai import OpenAI
 
+def load_source_document(source_path):
+    """
+    Load the source document content from the relative path.
+    
+    Args:
+        source_path: Relative path to the MD file from ../data_pipeline/
+        
+    Returns:
+        str: Content of the MD file, or empty string if not found
+    """
+    try:
+        # Construct full path relative to the Data_pipeline directory
+        data_pipeline_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "Data_pipeline")
+        full_path = os.path.join(data_pipeline_dir, source_path)
+        
+        # Ensure the path is safe and within the data_pipeline directory
+        full_path = os.path.abspath(full_path)
+        data_pipeline_dir = os.path.abspath(data_pipeline_dir)
+        
+        if not full_path.startswith(data_pipeline_dir):
+            print(f"Warning: Source path {source_path} is outside data_pipeline directory, skipping")
+            return ""
+        
+        if not os.path.exists(full_path):
+            print(f"Warning: Source file not found: {full_path}")
+            return ""
+        
+        with open(full_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            return content
+            
+    except Exception as e:
+        print(f"Error loading source document {source_path}: {e}")
+        return ""
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Do Eval datasets with openai api")
 
@@ -42,34 +77,38 @@ def generate(messages, model_name):
 
 # 数据验证和结果保存
 def validate_data(file, model_name):
-#     PROMPT = """You will receive a question along with a reference answer and a predicted answer. Your task is to evaluate the accuracy of the predicted answer and provide a concise explanation.
+    PROMPT = """You will receive a question along with a reference answer and a predicted answer. Your task is to evaluate the accuracy of the predicted answer and provide a concise explanation.
 
-# Compare the predicted answer to the reference answer to determine its correctness.
+Compare the predicted answer to the reference answer to determine its correctness.
 
-# **Guidelines**
-# - The criteria for evaluating the predicted answer should not be overly strict. If the predicted answer's meaning aligns closely with that of the reference answer, it can be deemed correct.
-# - For each question, provide a brief explanation of your reasoning, followed by "Correct" or "Incorrect." Include your final assessment within <assessment> tags.
+**Guidelines**
+- The criteria for evaluating the predicted answer should not be overly strict. If the predicted answer's meaning aligns closely with that of the reference answer, it can be deemed correct.
+- For each question, provide a brief explanation of your reasoning, followed by "Correct" or "Incorrect." Include your final assessment within <assessment> tags.
+- Use the provided source document content as authoritative "hard facts" to validate the accuracy of the predicted answer against real information.
 
-# **Output Format**
-# [Explanation]: Provide a brief explanation supporting your judgment.
-# [Assessment]: Provide your assessment **within <assessment> tags**.
+**Output Format**
+[Explanation]: Provide a brief explanation supporting your judgment.
+[Assessment]: Provide your assessment **within <assessment> tags**.
 
-# Here is the question:
-# {question}
+Here is the question:
+{question}
 
-# Here is the reference answer:
-# {reference}
+Here is the reference answer:
+{reference}
 
-# Here is the predicted answer:
-# {prediction}
-# """
-    PROMPT = '''Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer. Respond with True if the prediction is correct and False otherwise.
-Golden Answer may have multiple options, and matching any one of them is considered correct.
+Here is the predicted answer:
+{prediction}
 
-Question: {question}
-Golden Answer: {reference}
-Predicted Answer: {prediction}
-    '''
+Here is the source document content (use as authoritative reference):
+{source_content}
+"""
+#     PROMPT = '''Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer. Respond with True if the prediction is correct and False otherwise.
+# Golden Answer may have multiple options, and matching any one of them is considered correct.
+
+# Question: {question}
+# Golden Answer: {reference}
+# Predicted Answer: {prediction}
+#     '''
 
     # 获取所有以_finished结尾的jsonl文件
     print("Begin: ",file)
@@ -80,6 +119,7 @@ Predicted Answer: {prediction}
     valid_num = 0
     correct_num = 0
     incorrect_num = 0
+    source_docs_loaded = 0
     result_data = []  # 用来存储每个对象的处理结果
     
     # Load data based on file format
@@ -118,18 +158,45 @@ Predicted Answer: {prediction}
             #     prediction = remove_think_tags(prediction)
             question = obj.get("question", "")
             answer = obj.get("answer", [])
+            
+            # Load source document content
+            source_content = ""
+            metadata = obj.get("metadata", {})
+            source_path = metadata.get("source_path", "")
+            if source_path:
+                source_content = load_source_document(source_path)
+                if source_content:
+                    # Truncate source content if too long (keep first 8000 characters to stay within token limits)
+                    max_source_length = 8000
+                    if len(source_content) > max_source_length:
+                        source_content = source_content[:max_source_length] + "...[TRUNCATED]"
+                        print(f"Source document truncated to {max_source_length} characters")
+                    print(f"Loaded source document: {source_path} ({len(source_content)} chars)")
+                    source_docs_loaded += 1
+                else:
+                    print(f"Failed to load source document: {source_path}")
+            else:
+                print("No source_path found in metadata")
+            
             print("=="*70)
             print("Question:",question)
-            print(prediction)
-            print(answer)
+            print("Prediction:",prediction)
+            print("Reference:",answer)
+            if source_content:
+                print(f"Source content loaded: {len(source_content)} characters")
 
-            gpt4o_input = PROMPT.format(question = question,reference=answer, prediction=prediction)
+            gpt4o_input = PROMPT.format(
+                question=question,
+                reference=answer, 
+                prediction=prediction,
+                source_content=source_content if source_content else "No source document available"
+            )
             messages = [{'role': 'user', 'content': gpt4o_input}]
 
             # 获取GPT模型的评判结果
             model_output = generate(messages, model_name)
 
-            if "false" in model_output.lower():
+            if "<assessment>incorrect</assessment>" in model_output.lower():
                 is_correct = False
             else:
                 is_correct = True
@@ -157,6 +224,7 @@ Predicted Answer: {prediction}
     print(f"Valid objects: {valid_num}")
     print(f"Correct objects: {correct_num}")
     print(f"Incorrect objects: {incorrect_num}")
+    print(f"Source documents loaded: {source_docs_loaded}")
     print(f"Accuracy: {accuracy:.2f}%\n")
 
     # 保存到新的JSONL文件，名称与原文件相同

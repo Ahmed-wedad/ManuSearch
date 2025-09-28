@@ -144,7 +144,7 @@ class SearchAgent:
 
                 # Execute search and summarize results for each sub-query
                 
-                if not finish_condition(current_plan) and current_plan['actions'] == 'extract_problems':
+                if not finish_condition(current_plan) and "actions" in  current_plan and current_plan['actions'] == 'extract_problems':
                     current_subquery = current_plan['content']
                     step_message = [] 
                     if isinstance(current_subquery, list):

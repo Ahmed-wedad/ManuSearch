@@ -134,8 +134,8 @@ async def main_async():
     try:
         # Process questions 5-10 sequentially with complete processing
         reader = agent.reader
-        with tqdm(total=83) as pbar:
-            for item in filtered_data[18:100]:
+        with tqdm(total=20) as pbar:
+            for item in filtered_data[:20]:
                 # Process the question through ManuSearch
                 seq = await process_single_sequence(
                     agent=agent, message=item['question'],
@@ -182,7 +182,7 @@ async def main_async():
         result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
             
         with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-            json.dump(filtered_data[18:100], json_file, indent=4, ensure_ascii=False)
+            json.dump(filtered_data[:20], json_file, indent=4, ensure_ascii=False)
 
     total_time = time.time() - start_time
 
@@ -191,7 +191,7 @@ async def main_async():
     result_json_name = f'test_{random_num}_time_{t.tm_hour}_{t.tm_min}_{t.tm_sec}.json'
         
     with open(os.path.join("ManuSearch/outputs", result_json_name), mode='w', encoding='utf-8') as json_file:
-        json.dump(filtered_data[18:100], json_file, indent=4, ensure_ascii=False)
+        json.dump(filtered_data[:20], json_file, indent=4, ensure_ascii=False)
 
 
     print(f"Process completed. Results saved to {result_json_name} in {total_time:.2f} seconds.")
