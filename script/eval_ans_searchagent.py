@@ -4,7 +4,12 @@ p1 = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(p1)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
-from searchagent.utils.utils import remove_think_tags
+try:
+    from searchagent.utils.utils import remove_think_tags
+except ImportError:
+    print("Warning: Could not import remove_think_tags, using fallback")
+    def remove_think_tags(text):
+        return text
 import json
 import re
 from openai import OpenAI
@@ -21,7 +26,12 @@ def load_source_document(source_path):
     """
     try:
         # Construct full path relative to the Data_pipeline directory
-        data_pipeline_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "Data_pipeline")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        manusearch_dir = os.path.dirname(script_dir)
+        croissant_dir = os.path.dirname(manusearch_dir)
+        code_dir = os.path.dirname(croissant_dir)
+        data_pipeline_dir = os.path.join(code_dir, "Data_pipeline")
+        
         full_path = os.path.join(data_pipeline_dir, source_path)
         
         # Ensure the path is safe and within the data_pipeline directory
@@ -29,11 +39,9 @@ def load_source_document(source_path):
         data_pipeline_dir = os.path.abspath(data_pipeline_dir)
         
         if not full_path.startswith(data_pipeline_dir):
-            print(f"Warning: Source path {source_path} is outside data_pipeline directory, skipping")
             return ""
         
         if not os.path.exists(full_path):
-            print(f"Warning: Source file not found: {full_path}")
             return ""
         
         with open(full_path, 'r', encoding='utf-8') as f:
@@ -41,7 +49,6 @@ def load_source_document(source_path):
             return content
             
     except Exception as e:
-        print(f"Error loading source document {source_path}: {e}")
         return ""
 
 def parse_args():
@@ -170,13 +177,11 @@ Here is the source document content (use as authoritative reference):
                     max_source_length = 8000
                     if len(source_content) > max_source_length:
                         source_content = source_content[:max_source_length] + "...[TRUNCATED]"
-                        print(f"Source document truncated to {max_source_length} characters")
-                    print(f"Loaded source document: {source_path} ({len(source_content)} chars)")
                     source_docs_loaded += 1
                 else:
-                    print(f"Failed to load source document: {source_path}")
+                    pass  # Silently skip if source document not found
             else:
-                print("No source_path found in metadata")
+                pass  # No source_path in metadata
             
             print("=="*70)
             print("Question:",question)
