@@ -84,38 +84,39 @@ def generate(messages, model_name):
 
 # 数据验证和结果保存
 def validate_data(file, model_name):
-    PROMPT = """You will receive a question along with a reference answer and a predicted answer. Your task is to evaluate the accuracy of the predicted answer and provide a concise explanation.
+#     PROMPT = """You will receive a question along with a reference answer and a predicted answer. Your task is to evaluate the accuracy of the predicted answer and provide a concise explanation.
 
-Compare the predicted answer to the reference answer to determine its correctness.
+# Compare the predicted answer to the reference answer to determine its correctness.
 
-**Guidelines**
-- The criteria for evaluating the predicted answer should not be overly strict. If the predicted answer's meaning aligns closely with that of the reference answer, it can be deemed correct.
-- For each question, provide a brief explanation of your reasoning, followed by "Correct" or "Incorrect." Include your final assessment within <assessment> tags.
-- Use the provided source document content as authoritative "hard facts" to validate the accuracy of the predicted answer against real information.
+# **Guidelines**
+# - The criteria for evaluating the predicted answer should not be overly strict. If the predicted answer's meaning aligns closely with that of the reference answer, it can be deemed correct.
+# - For each question, provide a brief explanation of your reasoning, followed by "Correct" or "Incorrect." Include your final assessment within <assessment> tags.
+# - Use the provided source document content as authoritative "hard facts" to validate the accuracy of the predicted answer against real information.
 
-**Output Format**
-[Explanation]: Provide a brief explanation supporting your judgment.
-[Assessment]: Provide your assessment **within <assessment> tags**.
+# **Output Format**
+# [Explanation]: Provide a brief explanation supporting your judgment.
+# [Assessment]: Provide your assessment **within <assessment> tags**.
 
-Here is the question:
-{question}
+# Here is the question:
+# {question}
 
-Here is the reference answer:
-{reference}
+# Here is the reference answer:
+# {reference}
 
-Here is the predicted answer:
-{prediction}
+# Here is the predicted answer:
+# {prediction}
 
-Here is the source document content (use as authoritative reference):
-{source_content}
-"""
-#     PROMPT = '''Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer. Respond with True if the prediction is correct and False otherwise.
-# Golden Answer may have multiple options, and matching any one of them is considered correct.
+# Here is the source document content (use as authoritative reference):
+# {source_content}
+# """
+    PROMPT = '''Given a Question and its Golden Answer, verify whether the Predicted Answer is correct. The prediction is correct if it fully aligns with the meaning and key information of the Golden Answer. Respond with True if the prediction is correct and False otherwise.
+Golden Answer may have multiple options, and matching any one of them is considered correct. use source document content as authoritative reference to validate the accuracy of the predicted answer against real information.
 
-# Question: {question}
-# Golden Answer: {reference}
-# Predicted Answer: {prediction}
-#     '''
+Question: {question}
+Golden Answer: {reference}
+Predicted Answer: {prediction}
+Source Document Content: {source_content}
+    '''
 
     # 获取所有以_finished结尾的jsonl文件
     print("Begin: ",file)
@@ -201,7 +202,7 @@ Here is the source document content (use as authoritative reference):
             # 获取GPT模型的评判结果
             model_output = generate(messages, model_name)
 
-            if "<assessment>incorrect</assessment>" in model_output.lower():
+            if "false" in model_output.lower():
                 is_correct = False
             else:
                 is_correct = True
